@@ -1,0 +1,41 @@
+{
+  "rule_id": "GENERIC_WEB_TO_RCE",
+  "rule_name": "Phát hiện chung: Tấn công Web (Quét/Payload) -> Leo quyền (Webshell/RCE)",
+  "enabled": true,
+  "trigger_source": "apache_access",
+  "tree": {
+    "id": "L1_GENERIC_WEB_ATTACK",
+    "name": "Nhận diện rải Payload Web",
+    "severity": "LOW",
+    "emit_alert": true,
+    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_suspicious_payload = true OR http.status_code IN [400, 401, 403, 404, 500] WITH ip, count(req) AS suspicious_reqs, max(datetime(req.last_seen)) AS last_req WHERE suspicious_reqs > 10 RETURN ip.ip AS attacker_ip, toString(last_req) AS time_web_attack LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} liên tục nã payload/gây lỗi Web. Lần cuối lúc {time_web_attack}",
+      "next": [
+        {
+          "id": "L2_GENERIC_WEBSHELL_SPAWN",
+          "name": "Tiến trình Web kích hoạt Shell bất thường",
+          "severity": "HIGH",
+          "emit_alert": true,
+          "query": "MATCH (p_web:Process)-[spawn:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache' OR p_web.comm CONTAINS 'nginx' OR p_web.comm CONTAINS 'www-data') AND (p_shell.exe IN ['/bin/bash', '/bin/sh', 'nc', 'python', 'perl', 'wget', 'curl', 'whoami', 'id']) AND datetime(spawn.last_seen) >= datetime($time_web_attack) RETURN p_shell.exe AS shell_cmd, p_shell.pid AS shell_pid, toString(max(datetime(spawn.last_seen))) AS time_shell",
+          "on_match": {
+            "alert_message": "🚨 [HIGH] Web Server vừa sinh ra lệnh hệ thống bất thường: {shell_cmd} (PID: {shell_pid}) lúc {time_shell}. Nguy cơ bị RCE!",
+            "next": [
+              {
+                "id": "L3_GENERIC_NETWORK_CONNECT",
+                "name": "Shell kết nối mạng ngoài (Reverse Shell / Download)",
+                "severity": "CRITICAL",
+                "emit_alert": true,
+                "query": "MATCH (p_shell:Process {pid: $shell_pid})-[r:REQUESTED|QUERIED]->(net) RETURN labels(net)[0] AS net_type, net.id AS target_info",
+                "on_match": {
+                  "alert_message": "💥 [CRITICAL] Shell {shell_cmd} (PID: {shell_pid}) đang cố gắng kết nối mạng ngoài ({net_type}: {target_info})!",
+                  "next": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

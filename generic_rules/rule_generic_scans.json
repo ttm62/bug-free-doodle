@@ -1,0 +1,17 @@
+{
+  "rule_id": "GENERIC_SCANS",
+  "rule_name": "Phát hiện chung: Quét mạng và dò thám (Nmap, WPScan, Dirb...)",
+  "enabled": true,
+  "trigger_source": "apache_access",
+  "tree": {
+    "id": "L1_SCANNER_DETECT",
+    "name": "Nhận diện công cụ quét",
+    "severity": "LOW",
+    "emit_alert": true,
+    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.user_agent CONTAINS 'nmap' OR http.user_agent CONTAINS 'wpscan' OR http.user_agent CONTAINS 'dirb' OR http.user_agent CONTAINS 'nikto' WITH ip, count(req) AS scan_count, max(datetime(req.last_seen)) AS last_scan WHERE scan_count > 10 RETURN ip.ip AS scanner_ip, scan_count, toString(last_scan) AS last_scan_time LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [LOW] Phát hiện công cụ rà quét từ IP {scanner_ip}. Đã nã {scan_count} request, lần cuối lúc {last_scan_time}",
+      "next": []
+    }
+  }
+}

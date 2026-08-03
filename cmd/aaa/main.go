@@ -162,6 +162,8 @@ func main() {
 
 	fmt.Printf("[+] Loaded %d log files across replay sources.\n", len(sources))
 
+	startTime := time.Now()
+
 	h := &EntryHeap{}
 	heap.Init(h)
 
@@ -205,7 +207,7 @@ func main() {
 
 		processedCount++
 		if processedCount%2000 == 0 {
-			fmt.Printf("[*] Processed %d log events into provenance graph...\n", processedCount)
+			fmt.Printf("[*] Processed %d log events into provenance graph... (Elapsed: %v)\n", processedCount, time.Since(startTime))
 		}
 
 		advanceReplaySource(src)
@@ -220,5 +222,5 @@ func main() {
 		fmt.Printf("[!] Sink close error: %v\n", err)
 	}
 
-	fmt.Printf("[+] Finished processing %d log events. Mode: %s\n", processedCount, *mode)
+	fmt.Printf("[+] Finished processing %d log events in %v. Mode: %s\n", processedCount, time.Since(startTime), *mode)
 }

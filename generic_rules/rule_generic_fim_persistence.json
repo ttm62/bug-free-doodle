@@ -1,0 +1,41 @@
+{
+  "rule_id": "GENERIC_FIM_PERSISTENCE",
+  "rule_name": "Phát hiện chung: Mã độc chạy ngầm -> Sửa đổi file hệ thống -> Gọi về máy chủ C2",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_SUSPICIOUS_DROPPER",
+    "name": "Thực thi File lạ từ thư mục Tạm (/tmp)",
+    "severity": "MEDIUM",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[exec:EXECUTED]->(p:Process) WHERE p.exe CONTAINS '/tmp/' OR p.exe CONTAINS '/var/tmp/' OR p.exe CONTAINS '/dev/shm/' RETURN u.username AS user, p.exe AS payload_path, toString(max(datetime(exec.last_seen))) AS time_exec LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [MEDIUM] Cảnh báo: User {user} vừa chạy một file nhạy cảm từ thư mục tạm: {payload_path} lúc {time_exec}",
+      "next": [
+        {
+          "id": "L2_PERSISTENCE_FIM",
+          "name": "Ghi đè file hệ thống (Persistence)",
+          "severity": "HIGH",
+          "emit_alert": true,
+          "query": "MATCH (p2:Process {exe: $payload_path})-[w:WRITE]->(f:File) WHERE f.path CONTAINS 'cron' OR f.path CONTAINS 'rc.local' OR f.path CONTAINS 'init.d' OR f.path CONTAINS 'systemd' OR f.path CONTAINS '.bashrc' RETURN f.path AS modified_file, toString(max(datetime(w.last_seen))) AS time_fim",
+          "on_match": {
+            "alert_message": "🚨 [HIGH] CẢNH BÁO FIM: Mã độc {payload_path} đang sửa file hệ thống {modified_file} để cắm rễ (Persistence) lúc {time_fim}!",
+            "next": [
+              {
+                "id": "L3_C2_CONNECTION",
+                "name": "Kết nối C2 (Command & Control)",
+                "severity": "CRITICAL",
+                "emit_alert": true,
+                "query": "MATCH (p3:Process {exe: $payload_path})-[net:REQUESTED|QUERIED]->(ip:IPAddress) RETURN ip.ip AS c2_ip, toString(max(datetime(net.last_seen))) AS time_c2",
+                "on_match": {
+                  "alert_message": "💥 [CRITICAL] Báo động đỏ: Mã độc {payload_path} đang gọi về máy chủ C2 tại IP {c2_ip} lúc {time_c2}!",
+                  "next": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

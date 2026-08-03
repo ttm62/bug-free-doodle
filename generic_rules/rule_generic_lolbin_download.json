@@ -1,0 +1,29 @@
+{
+  "rule_id": "GENERIC_LOLBIN_DOWNLOAD",
+  "rule_name": "Phát hiện chung: Lạm dụng công cụ hệ thống (LoLBin) để tải mã độc",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_LOLBIN_NETWORK",
+    "name": "Công cụ hệ thống tải file lạ về thư mục Tạm",
+    "severity": "MEDIUM",
+    "emit_alert": true,
+    "query": "MATCH (p:Process)-[net:CONNECTED|QUERIED]->(ip:IPAddress) WHERE p.exe IN ['curl', 'wget', 'certutil', 'powershell', 'bitsadmin'] AND (p.command CONTAINS '/tmp/' OR p.command CONTAINS '/dev/shm/') WITH p, max(datetime(net.last_seen)) AS time_dl RETURN p.exe AS lolbin, p.command AS full_cmd, toString(time_dl) AS time_dl LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [MEDIUM] Cảnh báo LoLBin: Lệnh hệ thống {lolbin} vừa được dùng để tải file từ Internet về máy chủ: {full_cmd} lúc {time_dl}",
+      "next": [
+        {
+          "id": "L2_EXECUTE_DOWNLOADED_PAYLOAD",
+          "name": "Thực thi file vừa tải về",
+          "severity": "HIGH",
+          "emit_alert": true,
+          "query": "MATCH (u:User)-[exec:EXECUTED]->(p_new:Process) WHERE (p_new.exe CONTAINS '/tmp/' OR p_new.exe CONTAINS '/dev/shm/') AND datetime(exec.last_seen) >= datetime($time_dl) RETURN p_new.exe AS payload_exe, toString(max(datetime(exec.last_seen))) AS time_exec",
+          "on_match": {
+            "alert_message": "🚨 [HIGH] BÁO ĐỘNG: File mã độc tải về ({payload_exe}) đã được kích hoạt chạy thành công trên bộ nhớ tạm lúc {time_exec}!",
+            "next": []
+          }
+        }
+      ]
+    }
+  }
+}

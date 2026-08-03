@@ -1,0 +1,17 @@
+{
+  "rule_id": "GENERIC_DEFENSE_EVASION",
+  "rule_name": "Phát hiện chung: Xóa dấu vết / Che giấu hành vi (Defense Evasion)",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_CLEAR_LOGS",
+    "name": "Xóa Logs Hệ thống / Lịch sử lệnh",
+    "severity": "HIGH",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[exec:EXECUTED]->(p:Process) WHERE p.command CONTAINS 'history -c' OR p.command CONTAINS 'rm ~/.bash_history' OR p.command CONTAINS 'rm /var/log/' OR p.command CONTAINS '/dev/null >' RETURN u.username AS evader, p.command AS evade_cmd, toString(max(datetime(exec.last_seen))) AS time_evade LIMIT 5",
+    "on_match": {
+      "alert_message": "🚨 [HIGH] Tài khoản {evader} vừa chạy lệnh xóa dấu vết hệ thống ({evade_cmd}) lúc {time_evade}. Dấu hiệu phi tang bằng chứng cực kỳ nguy hiểm!",
+      "next": []
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "rule_id": "GENERIC_DATA_STAGING",
+  "rule_name": "Phát hiện chung: Đóng gói dữ liệu chuẩn bị tuồn ra ngoài (Data Staging)",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_ARCHIVE_DATA",
+    "name": "Nén dữ liệu dung lượng lớn",
+    "severity": "MEDIUM",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[exec:EXECUTED]->(p:Process)-[w:WRITE]->(f:File) WHERE p.exe IN ['tar', 'zip', 'rar', '7z', 'gzip'] AND (f.path CONTAINS '/tmp/' OR f.path CONTAINS '/dev/shm/' OR f.path CONTAINS '/var/tmp/') WITH u, p, f, max(datetime(w.last_seen)) AS write_time RETURN u.username AS user, p.command AS archive_cmd, f.path AS archive_file, toString(write_time) AS time_archive LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [MEDIUM] Tài khoản {user} đang chạy lệnh nén dữ liệu ({archive_cmd}) và xuất ra file {archive_file} lúc {time_archive}. Có thể hacker đang gom dữ liệu (Staging) để chuẩn bị tuồn ra ngoài!",
+      "next": []
+    }
+  }
+}

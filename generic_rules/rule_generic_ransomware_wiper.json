@@ -1,0 +1,29 @@
+{
+  "rule_id": "GENERIC_RANSOMWARE_WIPER",
+  "rule_name": "Phát hiện chung: Hành vi Ransomware / Wiper (Mã hóa/Xóa dữ liệu hàng loạt)",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_MASS_FILE_MODIFICATION",
+    "name": "Thay đổi/Tạo file hàng loạt",
+    "severity": "HIGH",
+    "emit_alert": true,
+    "query": "MATCH (p:Process)-[w:WRITE]->(f:File) WITH p, count(f) AS written_files, max(datetime(w.last_seen)) AS last_write WHERE written_files > 100 RETURN p.exe AS ransom_proc, written_files, toString(last_write) AS time_ransom LIMIT 5",
+    "on_match": {
+      "alert_message": "🚨 [HIGH] Tiến trình {ransom_proc} vừa ghi đè/tạo ra {written_files} file trong thời gian ngắn! Dấu hiệu của Ransomware mã hóa dữ liệu. Thời điểm: {time_ransom}",
+      "next": [
+        {
+          "id": "L2_SHADOW_COPY_DELETION",
+          "name": "Xóa bản sao lưu (Shadow Copies)",
+          "severity": "CRITICAL",
+          "emit_alert": true,
+          "query": "MATCH (p_parent:Process {exe: $ransom_proc})-[s:SPAWNED]->(p_child:Process) WHERE p_child.exe CONTAINS 'vssadmin' OR p_child.exe CONTAINS 'wbadmin' OR p_child.exe CONTAINS 'bcdedit' OR p_child.exe CONTAINS 'rm -rf' RETURN p_child.exe AS dest_cmd",
+          "on_match": {
+            "alert_message": "💥 [CRITICAL] Mức độ TỐI KHẨN: Tiến trình {ransom_proc} đang chạy lệnh phá hủy bản sao lưu phục hồi hệ thống ({dest_cmd})!",
+            "next": []
+          }
+        }
+      ]
+    }
+  }
+}

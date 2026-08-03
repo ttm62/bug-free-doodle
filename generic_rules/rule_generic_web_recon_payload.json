@@ -1,0 +1,41 @@
+{
+  "rule_id": "GENERIC_WEB_RECON_TO_RCE",
+  "rule_name": "Phát hiện chung: Rà quét thư mục ẩn (404/403) -> Chèn Payload thành công (200) -> Kích hoạt RCE Shell",
+  "enabled": true,
+  "trigger_source": "apache_access",
+  "tree": {
+    "id": "L1_WEB_RECON",
+    "name": "Nhận diện rà quét Web diện rộng",
+    "severity": "LOW",
+    "emit_alert": true,
+    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code IN [403, 404] WITH ip, count(req) AS err_count, max(datetime(req.last_seen)) AS last_err WHERE err_count > 20 RETURN ip.ip AS attacker_ip, err_count, toString(last_err) AS time_recon LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [LOW] Cảnh báo: IP {attacker_ip} gây ra {err_count} lỗi 403/404. Dấu hiệu rà quét thư mục ẩn! Lần cuối lúc {time_recon}",
+      "next": [
+        {
+          "id": "L2_PAYLOAD_SUCCESS",
+          "name": "Chèn Payload thành công (HTTP 200)",
+          "severity": "MEDIUM",
+          "emit_alert": true,
+          "query": "MATCH (ip2:IPAddress {ip: $attacker_ip})-[req2:REQUESTED]->(http2:HTTPRequest) WHERE http2.status_code = 200 AND http2.is_suspicious_payload = true AND datetime(req2.last_seen) >= datetime($time_recon) RETURN http2.uri AS payload_uri, toString(max(datetime(req2.last_seen))) AS time_payload",
+          "on_match": {
+            "alert_message": "🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: {payload_uri} (HTTP 200) lúc {time_payload}",
+            "next": [
+              {
+                "id": "L3_RCE_EXEC",
+                "name": "Kích hoạt RCE Shell",
+                "severity": "CRITICAL",
+                "emit_alert": true,
+                "query": "MATCH (p_web:Process)-[spawn:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'www-data') AND p_shell.exe IN ['/bin/bash', '/bin/sh', 'nc', 'perl', 'python', 'curl', 'wget'] AND datetime(spawn.last_seen) >= datetime($time_payload) RETURN p_shell.exe AS shell_cmd, toString(max(datetime(spawn.last_seen))) AS time_rce",
+                "on_match": {
+                  "alert_message": "💥 [CRITICAL] CẢNH BÁO RCE: Ứng dụng Web vừa bị chọc thủng, sinh ra Shell nguy hiểm ({shell_cmd}) lúc {time_rce}!",
+                  "next": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

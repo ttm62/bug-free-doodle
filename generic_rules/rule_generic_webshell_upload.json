@@ -1,0 +1,29 @@
+{
+  "rule_id": "GENERIC_WEBSHELL_UPLOAD",
+  "rule_name": "Phát hiện chung: Tải Webshell lên máy chủ",
+  "enabled": true,
+  "trigger_source": "apache_access",
+  "tree": {
+    "id": "L1_UPLOAD_PHP",
+    "name": "Nhận diện Upload File Nhạy Cảm",
+    "severity": "MEDIUM",
+    "emit_alert": true,
+    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE req.method = 'POST' AND (http.uri CONTAINS 'upload' OR http.uri CONTAINS 'plugin' OR http.uri ENDS WITH '.php' OR http.uri CONTAINS 'shell') WITH ip, max(datetime(req.last_seen)) AS upload_time RETURN ip.ip AS attacker_ip, toString(upload_time) AS upload_time LIMIT 5",
+    "on_match": {
+      "alert_message": "⚠️ [MEDIUM] Cảnh báo: IP {attacker_ip} vừa thực hiện Upload/POST vào URL nhạy cảm lúc {upload_time}",
+      "next": [
+        {
+          "id": "L2_WEBSHELL_EXEC",
+          "name": "Thực thi lệnh từ Webshell",
+          "severity": "HIGH",
+          "emit_alert": true,
+          "query": "MATCH (p_web:Process)-[spawn:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'www-data') AND p_shell.exe IN ['/bin/bash', '/bin/sh', 'nc', 'python'] AND datetime(spawn.last_seen) >= datetime($upload_time) RETURN p_shell.exe AS shell_cmd, p_shell.pid AS shell_pid, toString(max(datetime(spawn.last_seen))) AS exec_time",
+          "on_match": {
+            "alert_message": "🚨 [HIGH] Xác nhận: Web Server vừa kích hoạt Shell hệ thống ({shell_cmd}) ngay sau sự kiện Upload! Thời gian: {exec_time}",
+            "next": []
+          }
+        }
+      ]
+    }
+  }
+}

@@ -81,8 +81,8 @@ func (s *neo4jSink) WriteEvent(event OutputEvent) error {
 			"MERGE (a:%s {id: $from_id}) "+
 				"MERGE (b:%s {id: $to_id}) "+
 				"MERGE (a)-[r:%s]->(b) "+
-				"ON CREATE SET r += $props, r.count = 1, r.first_seen = $ts, r.last_seen = $ts "+
-				"ON MATCH SET r.count = coalesce(r.count, 1) + 1, r.last_seen = $ts",
+				"ON CREATE SET r += $props, r.count = 1, r.first_seen = $ts, r.last_seen = $ts, r.timestamp = $ts "+
+				"ON MATCH SET r.count = coalesce(r.count, 1) + 1, r.last_seen = $ts, r.timestamp = $ts",
 			rel.FromLabel, rel.ToLabel, rel.Type,
 		)
 		s.buffer = append(s.buffer, neo4jStatement{

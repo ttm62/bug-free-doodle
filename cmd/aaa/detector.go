@@ -185,10 +185,20 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 		params[k] = v
 	}
 
+	startQuery := time.Now()
 	results, err := runCypherQuery(url, user, pass, node.Query, params)
+	elapsedQuery := time.Since(startQuery)
+	indent := strings.Repeat("   ", depth-1)
+	
 	if err != nil {
-		fmt.Printf("   [!] Depth %d [%s] Cypher error: %v\n", depth, node.ID, err)
+		fmt.Printf("%s[!] Depth %d [%s] Cypher error: %v\n", indent, depth, node.ID, err)
 		return 0
+	}
+	
+	fmt.Printf("%s[🕒 %v] Đã quét lớp: %s\n", indent, elapsedQuery.Round(time.Millisecond), node.Name)
+	if f, err := os.OpenFile("query_stats.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(fmt.Sprintf("[%s] RuleID: %s | Depth: %d | Node: %s | Time: %v\n", time.Now().Format(time.RFC3339), rule.RuleID, depth, node.Name, elapsedQuery.Round(time.Millisecond)))
+		f.Close()
 	}
 
 	if len(results) == 0 {
@@ -206,7 +216,6 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 	}
 
 	alertCount := 0
-	indent := strings.Repeat("   ", depth-1)
 
 	for _, row := range results {
 		formattedMsg := formatAlertMessage(node.OnMatch.AlertMessage, row)

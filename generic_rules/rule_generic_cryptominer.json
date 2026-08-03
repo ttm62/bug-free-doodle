@@ -1,0 +1,29 @@
+{
+  "rule_id": "GENERIC_CRYPTOMINER",
+  "rule_name": "Phát hiện chung: Đào tiền ảo trái phép (Cryptojacking)",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_MINER_PROCESS",
+    "name": "Nhận diện tiến trình đào coin",
+    "severity": "HIGH",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[exec:EXECUTED]->(p:Process) WHERE p.exe CONTAINS 'xmrig' OR p.exe CONTAINS 'minerd' OR p.exe CONTAINS 'cgminer' OR p.exe CONTAINS 'kdevtmpfsi' OR p.exe CONTAINS 'xmr-stak' RETURN u.username AS miner_user, p.exe AS miner_proc, toString(max(datetime(exec.last_seen))) AS time_miner LIMIT 5",
+    "on_match": {
+      "alert_message": "🚨 [HIGH] Tài khoản {miner_user} đang chạy tiến trình nghi ngờ là phần mềm Đào tiền ảo (Cryptominer): {miner_proc} lúc {time_miner}",
+      "next": [
+        {
+          "id": "L2_POOL_CONNECTION",
+          "name": "Kết nối tới Mining Pool",
+          "severity": "CRITICAL",
+          "emit_alert": true,
+          "query": "MATCH (p:Process {exe: $miner_proc})-[net:CONNECTED]->(target:IPAddress) WHERE net.dst_port IN [3333, 14444, 4444, 5555, 7777, 9000, 443] RETURN target.ip AS pool_ip, net.dst_port AS pool_port",
+          "on_match": {
+            "alert_message": "💥 [CRITICAL] Phần mềm {miner_proc} đã kết nối ra Internet tới Mining Pool ở địa chỉ {pool_ip}:{pool_port}. Tài nguyên máy chủ đang bị bòn rút!",
+            "next": []
+          }
+        }
+      ]
+    }
+  }
+}
