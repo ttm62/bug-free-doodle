@@ -12,11 +12,11 @@ import (
 )
 
 var patterns = []LogPattern{
-	{"*/gather/*/logs/auth.log*", "auth_log"},
-	{"*/gather/*/logs/syslog*", "syslog"},
-	{"*/gather/*/logs/apache2/*access.log*", "apache_access"},
-	{"*/gather/*/logs/suricata/eve.json", "suricata"},
-	{"*/gather/*/logs/audit/audit.log*", "audit_log"},
+	{"gather/*/logs/auth.log*", "auth_log"},
+	{"gather/*/logs/syslog*", "syslog"},
+	{"gather/*/logs/apache2/*access.log*", "apache_access"},
+	{"gather/*/logs/suricata/eve.json", "suricata"},
+	{"gather/*/logs/audit/audit.log*", "audit_log"},
 }
 
 func getParser(logType string) LogParser {
@@ -77,11 +77,11 @@ func advanceReplaySource(source *ReplaySource) {
 	}
 }
 
-func loadReplaySources(workDir string) ([]ReplaySource, error) {
+func loadReplaySources(workDir string, folder string) ([]ReplaySource, error) {
 	var sources []ReplaySource
 
 	for _, pattern := range patterns {
-		globPattern := filepath.Join(workDir, pattern.Pattern)
+		globPattern := filepath.Join(workDir, folder, pattern.Pattern)
 		matches, err := filepath.Glob(globPattern)
 		if err != nil {
 			return nil, fmt.Errorf("invalid glob pattern %s: %w", globPattern, err)
@@ -139,6 +139,7 @@ func main() {
 	}
 
 	work_dir := flag.String("wd", dir, "Work dir")
+	datasetFolder := flag.String("folder", "*", "Dataset folder name (default: * for all)")
 	mode := flag.String("mode", "detect", "Execution mode: file | neo4j | detect")
 	outputFile := flag.String("output-file", defaultOutputFile, "Output JSONL filepath when -mode file")
 	alertsFile := flag.String("alerts-file", "detection_alerts.jsonl", "Output JSONL filepath for detection alerts when -mode detect")
@@ -162,7 +163,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sources, err := loadReplaySources(*work_dir)
+	sources, err := loadReplaySources(*work_dir, *datasetFolder)
 	if err != nil {
 		fmt.Printf("[!] Failed to load replay sources: %v\n", err)
 		os.Exit(1)
