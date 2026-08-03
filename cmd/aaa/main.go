@@ -5,17 +5,18 @@ import (
 	"container/heap"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
 )
 
 var patterns = []LogPattern{
-	{"/Users/rey/Desktop/wazuh-docker/russellmitchell_no-pcaps/gather/*/logs/auth.log*", "auth_log"},
-	{"/Users/rey/Desktop/wazuh-docker/russellmitchell_no-pcaps/gather/*/logs/syslog*", "syslog"},
-	{"/Users/rey/Desktop/wazuh-docker/russellmitchell_no-pcaps/gather/*/logs/apache2/*access.log*", "apache_access"},
-	{"/Users/rey/Desktop/wazuh-docker/russellmitchell_no-pcaps/gather/*/logs/suricata/eve.json", "suricata"},
-	{"/Users/rey/Desktop/wazuh-docker/russellmitchell_no-pcaps/gather/*/logs/audit/audit.log*", "audit_log"},
+	{"*/gather/*/logs/auth.log*", "auth_log"},
+	{"*/gather/*/logs/syslog*", "syslog"},
+	{"*/gather/*/logs/apache2/*access.log*", "apache_access"},
+	{"*/gather/*/logs/suricata/eve.json", "suricata"},
+	{"*/gather/*/logs/audit/audit.log*", "audit_log"},
 }
 
 func getParser(logType string) LogParser {
@@ -76,13 +77,14 @@ func advanceReplaySource(source *ReplaySource) {
 	}
 }
 
-func loadReplaySources() ([]ReplaySource, error) {
+func loadReplaySources(workDir string) ([]ReplaySource, error) {
 	var sources []ReplaySource
 
 	for _, pattern := range patterns {
-		matches, err := filepath.Glob(pattern.Pattern)
+		globPattern := filepath.Join(workDir, pattern.Pattern)
+		matches, err := filepath.Glob(globPattern)
 		if err != nil {
-			return nil, fmt.Errorf("invalid glob pattern %s: %w", pattern.Pattern, err)
+			return nil, fmt.Errorf("invalid glob pattern %s: %w", globPattern, err)
 		}
 
 		parser := getParser(pattern.LogType)
@@ -131,6 +133,12 @@ func pushCurrentLine(source *ReplaySource, sourceIndex int, heapObj *EntryHeap) 
 }
 
 func main() {
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	work_dir := flag.String("wd", dir, "Work dir")
 	mode := flag.String("mode", "detect", "Execution mode: file | neo4j | detect")
 	outputFile := flag.String("output-file", defaultOutputFile, "Output JSONL filepath when -mode file")
 	alertsFile := flag.String("alerts-file", "detection_alerts.jsonl", "Output JSONL filepath for detection alerts when -mode detect")
@@ -154,7 +162,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	sources, err := loadReplaySources()
+	sources, err := loadReplaySources(*work_dir)
 	if err != nil {
 		fmt.Printf("[!] Failed to load replay sources: %v\n", err)
 		os.Exit(1)
