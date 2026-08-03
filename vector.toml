@@ -1,0 +1,33 @@
+# docker exec single-node-wazuh.manager-1 tail -f /var/ossec/logs/archives/archives.json
+
+# docker run -d --name vector_shipper \
+#   -v /Users/rey/Desktop/wazuh-docker/vector.toml:/etc/vector/vector.toml:ro \
+#   -v single-node_wazuh_logs:/var/ossec/logs:ro \
+#   timberio/vector:latest-alpine \
+#   -c /etc/vector/vector.toml
+
+# docker exec single-node-wazuh.manager-1 sh -c "echo 'Jul 21 05:40:00 server sshd[1234]: Failed password for root from 1.1.1.1 port 22' >> /var/log/mock_logs/ait_syslog.log"
+# echo "Jul 21 05:40:00 server sshd[1234]: Failed password for root from 192.168.1.100 port 22" | nc -u -w1 127.0.0.1 514
+
+[sources.wazuh_raw]
+type = "file"
+include = ["/var/ossec/logs/archives/archives.json"]
+read_from = "end"
+
+[transforms.parse_message]
+type = "remap"
+inputs = ["wazuh_raw"]
+source = '''
+  # Dùng hàm parse_json! để biến chuỗi thành Object
+  .message = parse_json!(.message)
+'''
+
+# 3. ĐẨY VÀO GOLANG WEBHOOK VỚI BUFFER
+[sinks.golang_hook]
+type = "http"
+inputs = ["parse_message"]
+uri = "http://host.docker.internal:5050/raw_logs"
+encoding.codec = "json"
+
+batch.max_bytes = 1048576 
+batch.timeout_secs = 5 

@@ -1,0 +1,41 @@
+{
+  "rule_id": "RULE_SSH_BRUTEFORCE_TO_PIVOT",
+  "rule_name": "SSH Brute-force -> Successful Login -> Lateral Movement Pivot",
+  "enabled": true,
+  "trigger_source": "auth_log",
+  "tree": {
+    "id": "L1_SSH_FAILED",
+    "name": "Kiểm tra Dò Mật Khẩu SSH Thất Bại",
+    "severity": "LOW",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[r:AUTHENTICATED_ON {status: 'failed'}]->(ip:IPAddress) WITH u, ip, count(r) AS failed_count, max(datetime(r.timestamp)) AS last_fail_time WHERE failed_count >= 5 RETURN ip.ip AS attacker_ip, u.username AS target_user, failed_count, last_fail_time",
+    "on_match": {
+      "alert_message": "⚠️ [LOW] IP {attacker_ip} dò mật khẩu thất bại {failed_count} lần với tài khoản {target_user}",
+      "next": [
+        {
+          "id": "L2_SSH_SUCCESS",
+          "name": "Kiểm tra Đăng Nhập SSH Thành Công Ngay Sau Đó",
+          "severity": "MEDIUM",
+          "emit_alert": true,
+          "query": "MATCH (u:User {username: $target_user})-[r:AUTHENTICATED_ON {status: 'success'}]->(h:Host) WHERE datetime(r.timestamp) > $last_fail_time AND duration.inSeconds($last_fail_time, datetime(r.timestamp)).seconds < 3600 RETURN h.hostname AS compromised_host, max(datetime(r.timestamp)) AS success_time",
+          "on_match": {
+            "alert_message": "⚠️ [MEDIUM] IP {attacker_ip} đã chiếm quyền tài khoản {target_user} và đăng nhập thành công vào {compromised_host}!",
+            "next": [
+              {
+                "id": "L3_LATERAL_PIVOT",
+                "name": "Kiểm tra Di Chuyển Ngang Sang Máy Chủ Nội Bộ Khác",
+                "severity": "CRITICAL",
+                "emit_alert": true,
+                "query": "MATCH (u:User {username: $target_user})-[a1:AUTHENTICATED_ON]->(h1:Host {hostname: $compromised_host}) MATCH (u)-[a2:AUTHENTICATED_ON]->(h2:Host) WHERE h1.hostname <> h2.hostname AND datetime(a2.timestamp) > $success_time AND duration.inSeconds($success_time, datetime(a2.timestamp)).seconds < 86400 RETURN h1.hostname AS src_host, h2.hostname AS dest_host",
+                "on_match": {
+                  "alert_message": "🚨 [CRITICAL] CẢNH BÁO ĐỎ: Phát hiện hành vi di chuyển ngang (Lateral Movement) của {target_user} từ {src_host} sang {dest_host}!",
+                  "next": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

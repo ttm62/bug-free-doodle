@@ -1,0 +1,41 @@
+{
+  "rule_id": "RULE_APT_WEB_SHELL_TO_ROOT",
+  "rule_name": "Web Exploit -> Webshell Execution -> Sudo Root Escalation",
+  "enabled": true,
+  "trigger_source": "apache_access",
+  "tree": {
+    "id": "L1_WEB_PAYLOAD",
+    "name": "Kiểm tra HTTP Request nghi vấn Exploit",
+    "severity": "LOW",
+    "emit_alert": true,
+    "query": "MATCH (ip:IPAddress)-[r:REQUESTED]->(req:HTTPRequest) WHERE req.method = 'POST' AND (req.uri CONTAINS 'ajax' OR req.uri CONTAINS 'upload' OR req.uri CONTAINS 'horde' OR req.uri CONTAINS 'wp-' OR req.uri CONTAINS 'php') RETURN ip.ip AS attacker_ip, req.uri AS payload_uri",
+    "on_match": {
+      "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} gửi Web Exploit Payload tới: {payload_uri}",
+      "next": [
+        {
+          "id": "L2_WEBSHELL_SPAWNED",
+          "name": "Kiểm tra Web Server Spawn Interactive Shell",
+          "severity": "HIGH",
+          "emit_alert": true,
+          "query": "MATCH (ip:IPAddress {ip: $attacker_ip})-[req_rel:REQUESTED]->(req:HTTPRequest) MATCH (p_web:Process)-[spawn_rel:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache' OR p_web.comm CONTAINS 'www-data') AND (p_shell.exe IN ['/bin/bash', '/bin/sh', '/usr/bin/python', 'python', 'nc', 'perl'] OR p_shell.comm IN ['bash', 'sh', 'python', 'nc', 'perl']) AND datetime(spawn_rel.timestamp) >= datetime(req_rel.timestamp) AND duration.inSeconds(datetime(req_rel.timestamp), datetime(spawn_rel.timestamp)).seconds < 60 RETURN p_shell.pid AS shell_pid, p_shell.exe AS shell_exe",
+          "on_match": {
+            "alert_message": "💥 [HIGH] XÁC NHẬN: IP {attacker_ip} đã RCE Web Server spawn Shell {shell_exe} (PID: {shell_pid})!",
+            "next": [
+              {
+                "id": "L3_ROOT_ESCALATION",
+                "name": "Kiểm tra Leo Thang Quyền Root QUA Sudo",
+                "severity": "CRITICAL",
+                "emit_alert": true,
+                "query": "MATCH (p_shell:Process {pid: $shell_pid})-[:SPAWNED|EXECUTED*1..3]->(p_sudo:Process)-[:RAN_AS]->(u:User {username: 'root'}) WHERE p_sudo.exe CONTAINS 'sudo' OR p_sudo.comm = 'sudo' RETURN p_sudo.exe AS root_command",
+                "on_match": {
+                  "alert_message": "🚨 [CRITICAL] BÁO ĐỘNG ĐỎ: IP {attacker_ip} đã chiếm quyền ROOT thành công! Lệnh: {root_command}",
+                  "next": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+single-node/config/wazuh_indexer_ssl_certs/*.pem
+single-node/config/wazuh_indexer_ssl_certs/*.key
+multi-node/config/wazuh_indexer_ssl_certs/*.pem
+multi-node/config/wazuh_indexer_ssl_certs/*.key
+*.log
+russellmitchell_no-pcaps
+env/
+docs/
+build-docker-images/
+.github/
+aaa
+hook
+.DS_Store
+detection_alerts.jsonl
+cmd/replay/replay
+cmd/replay/replay.jsonl
+neo4j/neo4j/
