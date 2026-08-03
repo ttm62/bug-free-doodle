@@ -8,8 +8,6 @@ env/
 docs/
 build-docker-images/
 .github/
-aaa
-hook
 .DS_Store
 detection_alerts.jsonl
 cmd/replay/replay

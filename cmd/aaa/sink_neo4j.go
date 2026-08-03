@@ -1,0 +1,163 @@
+package main
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+)
+
+type neo4jStatement struct {
+	Statement  string                 `json:"statement"`
+	Parameters map[string]interface{} `json:"parameters"`
+}
+
+type neo4jTxRequest struct {
+	Statements []neo4jStatement `json:"statements"`
+}
+
+type neo4jTxResponse struct {
+	Errors []struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+type neo4jSink struct {
+	url       string
+	user      string
+	pass      string
+	client    *http.Client
+	buffer    []neo4jStatement
+	batchSize int
+}
+
+func newNeo4jSink(url, user, pass string) EventSink {
+	return &neo4jSink{
+		url:       url,
+		user:      user,
+		pass:      pass,
+		client:    &http.Client{Timeout: 15 * time.Second},
+		batchSize: 150,
+	}
+}
+
+func (s *neo4jSink) WriteEvent(event OutputEvent) error {
+	eventTS := event.Timestamp
+
+	// 1. Merge Nodes with property updates
+	for _, node := range event.Nodes {
+		props := make(map[string]interface{})
+		for k, v := range node.Properties {
+			props[k] = v
+		}
+		props["id"] = node.ID
+
+		stmt := fmt.Sprintf("MERGE (n:%s {id: $id}) SET n += $props", node.Label)
+		s.buffer = append(s.buffer, neo4jStatement{
+			Statement: stmt,
+			Parameters: map[string]interface{}{
+				"id":    node.ID,
+				"props": props,
+			},
+		})
+	}
+
+	// 2. Merge Relationships with Weighted Temporal Aggregation (ON CREATE / ON MATCH)
+	for _, rel := range event.Relationships {
+		props := make(map[string]interface{})
+		for k, v := range rel.Properties {
+			props[k] = v
+		}
+
+		relTS := rel.Timestamp
+		if relTS == "" {
+			relTS = eventTS
+		}
+
+		stmt := fmt.Sprintf(
+			"MERGE (a:%s {id: $from_id}) "+
+				"MERGE (b:%s {id: $to_id}) "+
+				"MERGE (a)-[r:%s]->(b) "+
+				"ON CREATE SET r += $props, r.count = 1, r.first_seen = $ts, r.last_seen = $ts "+
+				"ON MATCH SET r.count = coalesce(r.count, 1) + 1, r.last_seen = $ts",
+			rel.FromLabel, rel.ToLabel, rel.Type,
+		)
+		s.buffer = append(s.buffer, neo4jStatement{
+			Statement: stmt,
+			Parameters: map[string]interface{}{
+				"from_id": rel.FromID,
+				"to_id":   rel.ToID,
+				"props":   props,
+				"ts":      relTS,
+			},
+		})
+	}
+
+	if len(s.buffer) >= s.batchSize {
+		return s.flush()
+	}
+	return nil
+}
+
+func (s *neo4jSink) flush() error {
+	if len(s.buffer) == 0 {
+		return nil
+	}
+
+	reqBody := neo4jTxRequest{Statements: s.buffer}
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	endpoint := s.url + "/db/neo4j/tx/commit"
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.user != "" && s.pass != "" {
+		auth := base64.StdEncoding.EncodeToString([]byte(s.user + ":" + s.pass))
+		req.Header.Set("Authorization", "Basic "+auth)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		endpointLegacy := s.url + "/db/data/transaction/commit"
+		reqLegacy, errLeg := http.NewRequest("POST", endpointLegacy, bytes.NewBuffer(jsonBytes))
+		if errLeg != nil {
+			return err
+		}
+		reqLegacy.Header.Set("Content-Type", "application/json")
+		if s.user != "" && s.pass != "" {
+			auth := base64.StdEncoding.EncodeToString([]byte(s.user + ":" + s.pass))
+			reqLegacy.Header.Set("Authorization", "Basic "+auth)
+		}
+		resp, err = s.client.Do(reqLegacy)
+		if err != nil {
+			return fmt.Errorf("failed to connect to Neo4j at %s: %w", s.url, err)
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("neo4j HTTP status %d for %s", resp.StatusCode, endpoint)
+	}
+
+	var txResp neo4jTxResponse
+	if err := json.NewDecoder(resp.Body).Decode(&txResp); err == nil {
+		if len(txResp.Errors) > 0 {
+			return fmt.Errorf("neo4j transaction error: %s - %s", txResp.Errors[0].Code, txResp.Errors[0].Message)
+		}
+	}
+
+	s.buffer = s.buffer[:0]
+	return nil
+}
+
+func (s *neo4jSink) Close() error {
+	return s.flush()
+}
