@@ -49,10 +49,10 @@ func decodeAuditdIPv4(saddr string) (string, string) {
 	if !strings.HasPrefix(saddr, "0200") {
 		return "", ""
 	}
-	
+
 	// Ensure we only decode hex bytes
 	hexPart := saddr[4:16]
-	
+
 	portHex1, err1 := strconv.ParseUint(hexPart[0:2], 16, 8)
 	portHex2, err2 := strconv.ParseUint(hexPart[2:4], 16, 8)
 	ipHex1, err3 := strconv.ParseUint(hexPart[4:6], 16, 8)
@@ -81,8 +81,6 @@ func isBenignSystemProc(exe, comm string) bool {
 		strings.Contains(combined, "kworker") ||
 		strings.Contains(combined, "auditd")
 }
-
-
 
 // parseKeyValueString parses auditd key=value pairs into a map
 func parseKeyValueString(str string) map[string]string {

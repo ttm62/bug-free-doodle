@@ -8,9 +8,9 @@
     "name": "Công cụ hệ thống tải file lạ về thư mục Tạm",
     "severity": "MEDIUM",
     "emit_alert": true,
-    "query": "MATCH (p:Process)-[net:CONNECTED|QUERIED]->(ip:IPAddress) WHERE p.exe IN ['curl', 'wget', 'certutil', 'powershell', 'bitsadmin'] AND (p.command CONTAINS '/tmp/' OR p.command CONTAINS '/dev/shm/') WITH p, max(datetime(net.last_seen)) AS time_dl RETURN p.exe AS lolbin, p.command AS full_cmd, toString(time_dl) AS time_dl LIMIT 5",
+    "query": "MATCH (p:Process)-[net:CONNECTED|QUERIED]->(ip:IPAddress) WHERE p.exe IN ['curl', 'wget', 'nc', 'ftp', 'scp', 'bash'] AND (p.command CONTAINS '/tmp/' OR p.command CONTAINS '/dev/shm/') WITH p, max(datetime(net.last_seen)) AS time_dl RETURN p.exe AS lolbin, p.command AS full_cmd, toString(time_dl) AS time_dl LIMIT 5",
     "on_match": {
-      "alert_message": "⚠️ [MEDIUM] Cảnh báo LoLBin: Lệnh hệ thống {lolbin} vừa được dùng để tải file từ Internet về máy chủ: {full_cmd} lúc {time_dl}",
+      "alert_message": "⚠️ [MEDIUM] Cảnh báo LoLBin: Lệnh hệ thống Linux {lolbin} vừa được dùng để tải file từ Internet về máy chủ: {full_cmd} lúc {time_dl}",
       "next": [
         {
           "id": "L2_EXECUTE_DOWNLOADED_PAYLOAD",

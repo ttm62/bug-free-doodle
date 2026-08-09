@@ -1,14 +1,204 @@
-{"timestamp":"2026-08-03T20:38:36.578945Z","rule_id":"GENERIC_DDOS_HTTP","rule_name":"Phát hiện chung: Tấn công từ chối dịch vụ (DoS/DDoS) qua HTTP","node_id":"L1_HTTP_FLOOD","node_name":"Nhận diện Flood Requests","severity":"HIGH","depth":1,"alert_message":"🚨 [HIGH] BÁO ĐỘNG DoS/DDoS: IP 172.21.128.119 đang dội bom máy chủ với 7786 HTTP Requests. Dấu hiệu HTTP Flood! Lần cuối lúc 2022-01-18T05:41:34.545079Z","details":{"attacker_ip":"172.21.128.119","req_count":7786,"time_ddos":"2022-01-18T05:41:34.545079Z"}}
-{"timestamp":"2026-08-03T20:38:36.8423699Z","rule_id":"GENERIC_DATA_EXFILTRATION","rule_name":"Phát hiện chung: Tuồn dữ liệu ra ngoài (Data Exfiltration)","node_id":"L1_EXFIL_DNS","node_name":"Nhận diện đường hầm DNS (DNS Tunneling)","severity":"HIGH","depth":1,"alert_message":"💥 [HIGH] Máy chủ 10.229.0.4 đang có dấu hiệu tuồn dữ liệu qua DNS! (15326 gói tin, lần cuối lúc 2022-01-17T17:25:00.990335Z)","details":{"dns_count":15326,"exfil_ip":"10.229.0.4","last_dns_time":"2022-01-17T17:25:00.990335Z"}}
-{"timestamp":"2026-08-03T20:38:36.8435399Z","rule_id":"GENERIC_DATA_EXFILTRATION","rule_name":"Phát hiện chung: Tuồn dữ liệu ra ngoài (Data Exfiltration)","node_id":"L1_EXFIL_DNS","node_name":"Nhận diện đường hầm DNS (DNS Tunneling)","severity":"HIGH","depth":1,"alert_message":"💥 [HIGH] Máy chủ 192.168.104.218 đang có dấu hiệu tuồn dữ liệu qua DNS! (15048 gói tin, lần cuối lúc 2022-01-16T07:16:04.980602Z)","details":{"dns_count":15048,"exfil_ip":"192.168.104.218","last_dns_time":"2022-01-16T07:16:04.980602Z"}}
-{"timestamp":"2026-08-03T20:38:36.8436116Z","rule_id":"GENERIC_DATA_EXFILTRATION","rule_name":"Phát hiện chung: Tuồn dữ liệu ra ngoài (Data Exfiltration)","node_id":"L1_EXFIL_DNS","node_name":"Nhận diện đường hầm DNS (DNS Tunneling)","severity":"HIGH","depth":1,"alert_message":"💥 [HIGH] Máy chủ 172.21.128.119 đang có dấu hiệu tuồn dữ liệu qua DNS! (82 gói tin, lần cuối lúc 2022-01-17T16:42:10.506467Z)","details":{"dns_count":82,"exfil_ip":"172.21.128.119","last_dns_time":"2022-01-17T16:42:10.506467Z"}}
-{"timestamp":"2026-08-03T20:38:36.8891968Z","rule_id":"GENERIC_PASSWORD_CRACKING","rule_name":"Phát hiện chung: Password Cracking / Brute-force","node_id":"L1_AUTH_BRUTEFORCE","node_name":"Nhận diện nỗ lực đăng nhập thất bại/liên tục","severity":"LOW","depth":1,"alert_message":"⚠️ [LOW] IP 172.21.128.119 liên tục thử đăng nhập Web (53 lần). Lần cuối lúc 2022-01-17T21:15:23Z","details":{"attacker_ip":"172.21.128.119","auth_attempts":53,"last_attempt_time":"2022-01-17T21:15:23Z"}}
-{"timestamp":"2026-08-03T20:38:37.1466518Z","rule_id":"GENERIC_PRIVILEGE_ESCALATION","rule_name":"Phát hiện chung: Leo thang đặc quyền (su/sudo)","node_id":"L1_SU_ESCALATION","node_name":"Chuyển tài khoản bất thường","severity":"MEDIUM","depth":1,"alert_message":"🚨 [MEDIUM] Tài khoản dịch vụ www-data bỗng nhiên chuyển sang tài khoản gmorgan lúc 2022-01-17T11:58:17Z","details":{"elevated_user":"gmorgan","esc_time":"2022-01-17T11:58:17Z","original_user":"www-data"}}
-{"timestamp":"2026-08-03T20:38:37.1524124Z","rule_id":"GENERIC_PRIVILEGE_ESCALATION","rule_name":"Phát hiện chung: Leo thang đặc quyền (su/sudo)","node_id":"L2_SUDO_FOLLOWUP","node_name":"Lạm dụng Sudo sau khi su","severity":"CRITICAL","depth":2,"alert_message":"💥 [CRITICAL] {elevated_user} tiếp tục leo thang thành ROOT bằng lệnh sudo: list lúc 2022-01-17T11:58:54Z!","details":{"root_command":"list","sudo_time":"2022-01-17T11:58:54Z"}}
-{"timestamp":"2026-08-03T20:38:37.2214771Z","rule_id":"GENERIC_SCANS","rule_name":"Phát hiện chung: Quét mạng và dò thám (Nmap, WPScan, Dirb...)","node_id":"L1_SCANNER_DETECT","node_name":"Nhận diện công cụ quét","severity":"LOW","depth":1,"alert_message":"⚠️ [LOW] Phát hiện công cụ rà quét từ IP 172.21.128.119. Đã nã 3179 request, lần cuối lúc 2022-01-17T11:58:04Z","details":{"last_scan_time":"2022-01-17T11:58:04Z","scan_count":3179,"scanner_ip":"172.21.128.119"}}
-{"timestamp":"2026-08-03T20:38:37.309498Z","rule_id":"GENERIC_WEB_TO_RCE","rule_name":"Phát hiện chung: Tấn công Web (Quét/Payload) -\u003e Leo quyền (Webshell/RCE)","node_id":"L1_GENERIC_WEB_ATTACK","node_name":"Nhận diện rải Payload Web","severity":"LOW","depth":1,"alert_message":"⚠️ [LOW] Phát hiện IP 172.21.128.119 liên tục nã payload/gây lỗi Web. Lần cuối lúc 2022-01-17T20:26:31Z","details":{"attacker_ip":"172.21.128.119","time_web_attack":"2022-01-17T20:26:31Z"}}
-{"timestamp":"2026-08-03T20:38:37.3666627Z","rule_id":"GENERIC_WEB_RECON_TO_RCE","rule_name":"Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell","node_id":"L1_WEB_RECON","node_name":"Nhận diện rà quét Web diện rộng","severity":"LOW","depth":1,"alert_message":"⚠️ [LOW] Cảnh báo: IP 172.21.128.119 gây ra 7615 lỗi 403/404. Dấu hiệu rà quét thư mục ẩn! Lần cuối lúc 2022-01-17T11:22:46Z","details":{"attacker_ip":"172.21.128.119","err_count":7615,"time_recon":"2022-01-17T11:22:46Z"}}
-{"timestamp":"2026-08-03T20:38:37.396033Z","rule_id":"GENERIC_WEB_RECON_TO_RCE","rule_name":"Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell","node_id":"L2_PAYLOAD_SUCCESS","node_name":"Chèn Payload thành công (HTTP 200)","severity":"MEDIUM","depth":2,"alert_message":"🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /wp-admin/admin-ajax.php (HTTP 200) lúc 2022-01-17T20:26:31Z","details":{"payload_uri":"/wp-admin/admin-ajax.php","time_payload":"2022-01-17T20:26:31Z"}}
-{"timestamp":"2026-08-03T20:38:37.403232Z","rule_id":"GENERIC_WEB_RECON_TO_RCE","rule_name":"Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell","node_id":"L2_PAYLOAD_SUCCESS","node_name":"Chèn Payload thành công (HTTP 200)","severity":"MEDIUM","depth":2,"alert_message":"🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /nag/task.php (HTTP 200) lúc 2022-01-17T16:58:00Z","details":{"payload_uri":"/nag/task.php","time_payload":"2022-01-17T16:58:00Z"}}
-{"timestamp":"2026-08-03T20:38:37.4078394Z","rule_id":"GENERIC_WEB_RECON_TO_RCE","rule_name":"Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell","node_id":"L2_PAYLOAD_SUCCESS","node_name":"Chèn Payload thành công (HTTP 200)","severity":"MEDIUM","depth":2,"alert_message":"🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /mnemo/memo.php (HTTP 200) lúc 2022-01-17T17:59:30Z","details":{"payload_uri":"/mnemo/memo.php","time_payload":"2022-01-17T17:59:30Z"}}
-{"timestamp":"2026-08-03T20:38:37.4140893Z","rule_id":"GENERIC_WEB_RECON_TO_RCE","rule_name":"Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell","node_id":"L2_PAYLOAD_SUCCESS","node_name":"Chèn Payload thành công (HTTP 200)","severity":"MEDIUM","depth":2,"alert_message":"🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /imp/view.php (HTTP 200) lúc 2022-01-17T13:45:42Z","details":{"payload_uri":"/imp/view.php","time_payload":"2022-01-17T13:45:42Z"}}
+{
+    "timestamp": "2026-08-03T20:38:36.578945Z",
+    "rule_id": "GENERIC_DDOS_HTTP",
+    "rule_name": "Phát hiện chung: Tấn công từ chối dịch vụ (DoS/DDoS) qua HTTP",
+    "node_id": "L1_HTTP_FLOOD",
+    "node_name": "Nhận diện Flood Requests",
+    "severity": "HIGH",
+    "depth": 1,
+    "alert_message": "🚨 [HIGH] BÁO ĐỘNG DoS/DDoS: IP 172.21.128.119 đang dội bom máy chủ với 7786 HTTP Requests. Dấu hiệu HTTP Flood! Lần cuối lúc 2022-01-18T05:41:34.545079Z",
+    "details": {
+        "attacker_ip": "172.21.128.119",
+        "req_count": 7786,
+        "time_ddos": "2022-01-18T05:41:34.545079Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:36.8423699Z",
+    "rule_id": "GENERIC_DATA_EXFILTRATION",
+    "rule_name": "Phát hiện chung: Tuồn dữ liệu ra ngoài (Data Exfiltration)",
+    "node_id": "L1_EXFIL_DNS",
+    "node_name": "Nhận diện đường hầm DNS (DNS Tunneling)",
+    "severity": "HIGH",
+    "depth": 1,
+    "alert_message": "💥 [HIGH] Máy chủ 10.229.0.4 đang có dấu hiệu tuồn dữ liệu qua DNS! (15326 gói tin, lần cuối lúc 2022-01-17T17:25:00.990335Z)",
+    "details": {
+        "dns_count": 15326,
+        "exfil_ip": "10.229.0.4",
+        "last_dns_time": "2022-01-17T17:25:00.990335Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:36.8435399Z",
+    "rule_id": "GENERIC_DATA_EXFILTRATION",
+    "rule_name": "Phát hiện chung: Tuồn dữ liệu ra ngoài (Data Exfiltration)",
+    "node_id": "L1_EXFIL_DNS",
+    "node_name": "Nhận diện đường hầm DNS (DNS Tunneling)",
+    "severity": "HIGH",
+    "depth": 1,
+    "alert_message": "💥 [HIGH] Máy chủ 192.168.104.218 đang có dấu hiệu tuồn dữ liệu qua DNS! (15048 gói tin, lần cuối lúc 2022-01-16T07:16:04.980602Z)",
+    "details": {
+        "dns_count": 15048,
+        "exfil_ip": "192.168.104.218",
+        "last_dns_time": "2022-01-16T07:16:04.980602Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:36.8436116Z",
+    "rule_id": "GENERIC_DATA_EXFILTRATION",
+    "rule_name": "Phát hiện chung: Tuồn dữ liệu ra ngoài (Data Exfiltration)",
+    "node_id": "L1_EXFIL_DNS",
+    "node_name": "Nhận diện đường hầm DNS (DNS Tunneling)",
+    "severity": "HIGH",
+    "depth": 1,
+    "alert_message": "💥 [HIGH] Máy chủ 172.21.128.119 đang có dấu hiệu tuồn dữ liệu qua DNS! (82 gói tin, lần cuối lúc 2022-01-17T16:42:10.506467Z)",
+    "details": {
+        "dns_count": 82,
+        "exfil_ip": "172.21.128.119",
+        "last_dns_time": "2022-01-17T16:42:10.506467Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:36.8891968Z",
+    "rule_id": "GENERIC_PASSWORD_CRACKING",
+    "rule_name": "Phát hiện chung: Password Cracking / Brute-force",
+    "node_id": "L1_AUTH_BRUTEFORCE",
+    "node_name": "Nhận diện nỗ lực đăng nhập thất bại/liên tục",
+    "severity": "LOW",
+    "depth": 1,
+    "alert_message": "⚠️ [LOW] IP 172.21.128.119 liên tục thử đăng nhập Web (53 lần). Lần cuối lúc 2022-01-17T21:15:23Z",
+    "details": {
+        "attacker_ip": "172.21.128.119",
+        "auth_attempts": 53,
+        "last_attempt_time": "2022-01-17T21:15:23Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.1466518Z",
+    "rule_id": "GENERIC_PRIVILEGE_ESCALATION",
+    "rule_name": "Phát hiện chung: Leo thang đặc quyền (su/sudo)",
+    "node_id": "L1_SU_ESCALATION",
+    "node_name": "Chuyển tài khoản bất thường",
+    "severity": "MEDIUM",
+    "depth": 1,
+    "alert_message": "🚨 [MEDIUM] Tài khoản dịch vụ www-data bỗng nhiên chuyển sang tài khoản gmorgan lúc 2022-01-17T11:58:17Z",
+    "details": {
+        "elevated_user": "gmorgan",
+        "esc_time": "2022-01-17T11:58:17Z",
+        "original_user": "www-data"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.1524124Z",
+    "rule_id": "GENERIC_PRIVILEGE_ESCALATION",
+    "rule_name": "Phát hiện chung: Leo thang đặc quyền (su/sudo)",
+    "node_id": "L2_SUDO_FOLLOWUP",
+    "node_name": "Lạm dụng Sudo sau khi su",
+    "severity": "CRITICAL",
+    "depth": 2,
+    "alert_message": "💥 [CRITICAL] {elevated_user} tiếp tục leo thang thành ROOT bằng lệnh sudo: list lúc 2022-01-17T11:58:54Z!",
+    "details": {
+        "root_command": "list",
+        "sudo_time": "2022-01-17T11:58:54Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.2214771Z",
+    "rule_id": "GENERIC_SCANS",
+    "rule_name": "Phát hiện chung: Quét mạng và dò thám (Nmap, WPScan, Dirb...)",
+    "node_id": "L1_SCANNER_DETECT",
+    "node_name": "Nhận diện công cụ quét",
+    "severity": "LOW",
+    "depth": 1,
+    "alert_message": "⚠️ [LOW] Phát hiện công cụ rà quét từ IP 172.21.128.119. Đã nã 3179 request, lần cuối lúc 2022-01-17T11:58:04Z",
+    "details": {
+        "last_scan_time": "2022-01-17T11:58:04Z",
+        "scan_count": 3179,
+        "scanner_ip": "172.21.128.119"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.309498Z",
+    "rule_id": "GENERIC_WEB_TO_RCE",
+    "rule_name": "Phát hiện chung: Tấn công Web (Quét/Payload) -\u003e Leo quyền (Webshell/RCE)",
+    "node_id": "L1_GENERIC_WEB_ATTACK",
+    "node_name": "Nhận diện rải Payload Web",
+    "severity": "LOW",
+    "depth": 1,
+    "alert_message": "⚠️ [LOW] Phát hiện IP 172.21.128.119 liên tục nã payload/gây lỗi Web. Lần cuối lúc 2022-01-17T20:26:31Z",
+    "details": {
+        "attacker_ip": "172.21.128.119",
+        "time_web_attack": "2022-01-17T20:26:31Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.3666627Z",
+    "rule_id": "GENERIC_WEB_RECON_TO_RCE",
+    "rule_name": "Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell",
+    "node_id": "L1_WEB_RECON",
+    "node_name": "Nhận diện rà quét Web diện rộng",
+    "severity": "LOW",
+    "depth": 1,
+    "alert_message": "⚠️ [LOW] Cảnh báo: IP 172.21.128.119 gây ra 7615 lỗi 403/404. Dấu hiệu rà quét thư mục ẩn! Lần cuối lúc 2022-01-17T11:22:46Z",
+    "details": {
+        "attacker_ip": "172.21.128.119",
+        "err_count": 7615,
+        "time_recon": "2022-01-17T11:22:46Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.396033Z",
+    "rule_id": "GENERIC_WEB_RECON_TO_RCE",
+    "rule_name": "Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell",
+    "node_id": "L2_PAYLOAD_SUCCESS",
+    "node_name": "Chèn Payload thành công (HTTP 200)",
+    "severity": "MEDIUM",
+    "depth": 2,
+    "alert_message": "🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /wp-admin/admin-ajax.php (HTTP 200) lúc 2022-01-17T20:26:31Z",
+    "details": {
+        "payload_uri": "/wp-admin/admin-ajax.php",
+        "time_payload": "2022-01-17T20:26:31Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.403232Z",
+    "rule_id": "GENERIC_WEB_RECON_TO_RCE",
+    "rule_name": "Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell",
+    "node_id": "L2_PAYLOAD_SUCCESS",
+    "node_name": "Chèn Payload thành công (HTTP 200)",
+    "severity": "MEDIUM",
+    "depth": 2,
+    "alert_message": "🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /nag/task.php (HTTP 200) lúc 2022-01-17T16:58:00Z",
+    "details": {
+        "payload_uri": "/nag/task.php",
+        "time_payload": "2022-01-17T16:58:00Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.4078394Z",
+    "rule_id": "GENERIC_WEB_RECON_TO_RCE",
+    "rule_name": "Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell",
+    "node_id": "L2_PAYLOAD_SUCCESS",
+    "node_name": "Chèn Payload thành công (HTTP 200)",
+    "severity": "MEDIUM",
+    "depth": 2,
+    "alert_message": "🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /mnemo/memo.php (HTTP 200) lúc 2022-01-17T17:59:30Z",
+    "details": {
+        "payload_uri": "/mnemo/memo.php",
+        "time_payload": "2022-01-17T17:59:30Z"
+    }
+}
+{
+    "timestamp": "2026-08-03T20:38:37.4140893Z",
+    "rule_id": "GENERIC_WEB_RECON_TO_RCE",
+    "rule_name": "Phát hiện chung: Rà quét thư mục ẩn (404/403) -\u003e Chèn Payload thành công (200) -\u003e Kích hoạt RCE Shell",
+    "node_id": "L2_PAYLOAD_SUCCESS",
+    "node_name": "Chèn Payload thành công (HTTP 200)",
+    "severity": "MEDIUM",
+    "depth": 2,
+    "alert_message": "🚨 [MEDIUM] IP {attacker_ip} đã chèn thành công Payload vào URL: /imp/view.php (HTTP 200) lúc 2022-01-17T13:45:42Z",
+    "details": {
+        "payload_uri": "/imp/view.php",
+        "time_payload": "2022-01-17T13:45:42Z"
+    }
+}

@@ -140,20 +140,27 @@ func main() {
 
 	work_dir := flag.String("wd", dir, "Work dir")
 	datasetFolder := flag.String("folder", "*", "Dataset folder name (default: * for all)")
-	mode := flag.String("mode", "detect", "Execution mode: file | neo4j | detect")
+	mode := flag.String("mode", "detect", "Execution mode: file | neo4j | detect | webhook")
 	outputFile := flag.String("output-file", defaultOutputFile, "Output JSONL filepath when -mode file")
 	alertsFile := flag.String("alerts-file", "detection_alerts.jsonl", "Output JSONL filepath for detection alerts when -mode detect")
 	minSeverity := flag.String("min-severity", "LOW", "Minimum severity level filter: LOW | MEDIUM | HIGH | CRITICAL")
 	neo4jURL := flag.String("neo4j-url", defaultNeo4jURL, "Neo4j HTTP API base URL when -mode neo4j or detect")
 	neo4jUser := flag.String("neo4j-user", defaultNeo4jUser, "Neo4j username")
 	neo4jPass := flag.String("neo4j-pass", defaultNeo4jPass, "Neo4j password")
-	rulesPath := flag.String("rules", "rules", "JSON Decision Tree rules file or directory path when -mode detect")
+	rulesPath := flag.String("rules", "rules", "JSON Decision Tree rules file or directory path when -mode detect or webhook")
 	rateLimit := flag.Float64("rate", defaultRate, "Maximum log events per second to process (replay speed limit)")
+	webhookPort := flag.Int("webhook-port", 5050, "Port for webhook server when -mode webhook")
+	scanInterval := flag.Int("scan-interval", 60, "Interval in seconds to run detection scan when -mode webhook")
 
 	flag.Parse()
 
 	if *mode == "detect" {
 		runDetectionMode(*rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass)
+		return
+	}
+
+	if *mode == "webhook" {
+		runWebhookMode(*webhookPort, *scanInterval, *rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass)
 		return
 	}
 

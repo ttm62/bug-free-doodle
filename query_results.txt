@@ -1,0 +1,70 @@
+--- QUERY: MATCH (n) RETURN labels(n)[0] AS Loai_Thuc_The, count(*) AS So_Luong ORDER BY So_Luong DESC; ---
+Loai_Thuc_The, So_Luong
+"IPAddress", 35087
+"DNSQuery", 22624
+"Process", 8494
+"HTTPRequest", 7810
+"Alert", 16
+"Host", 10
+"User", 7
+
+--- QUERY: MATCH ()-[r]->() RETURN type(r) AS Loai_Hanh_Vi, count(*) AS So_Luong ORDER BY So_Luong DESC; ---
+Loai_Hanh_Vi, So_Luong
+"QUERIED", 43937
+"REQUESTED", 8356
+"RAN_ON", 6050
+"RAN_AS", 5238
+"RAISED", 1383
+"TARGETED", 1378
+"CONNECTED", 637
+"AUTHENTICATED_ON", 5
+"SPAWNED", 4
+
+--- QUERY: MATCH (p:Process) WHERE p.cmdline IS NOT NULL OR p.exe IS NOT NULL RETURN p.pid AS Process_ID, p.exe AS Executable_File, p.cmdline AS Command_Line, p.working_dir AS Working_Directory LIMIT 5; ---
+Process_ID, Executable_File, Command_Line, Working_Directory
+"10944", "/usr/lib/dovecot/auth", NULL, NULL
+"10957", "/usr/lib/dovecot/auth", NULL, NULL
+"10978", "/usr/lib/dovecot/auth", NULL, NULL
+"9830", "CRON", NULL, NULL
+"9831", "CRON", NULL, NULL
+
+--- QUERY: MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.uri CONTAINS 'wp-login.php' OR http.uri CONTAINS 'xmlrpc.php' WITH ip, count(req) AS scan_attempts, max(datetime(req.last_seen)) AS last_attempt WHERE scan_attempts >= 1 RETURN ip.ip AS attacker_ip, scan_attempts, last_attempt ORDER BY scan_attempts DESC; ---
+attacker_ip, scan_attempts, last_attempt
+"172.19.131.174", 3084, 2022-01-24T04:37:25Z
+"cloud.dmz.smith.russellmitchell.com:80", 3, 2022-01-24T03:57:18Z
+"cloud.dmz.smith.russellmitchell.com:443", 3, 2022-01-24T03:57:18Z
+"192.168.230.122", 3, 2022-01-24T03:57:01.932370Z
+
+--- QUERY: MATCH (u:User {username: 'www-data'})-[r:RAN_AS {is_su: true}]->(p:Process) RETURN u.username AS ke_thu_noi_bo, r.target_user AS tai_khoan_bi_chiem, p.exe AS lenh_su_dung, r.last_seen AS thoi_gian; ---
+ke_thu_noi_bo, tai_khoan_bi_chiem, lenh_su_dung, thoi_gian
+"www-data", "jhall", "su", "2022-01-24T04:37:40Z"
+
+--- QUERY: MATCH (u:User {username: 'jhall'})-[r:RAN_AS {is_sudo: true}]->(p:Process) RETURN u.username AS user_thuc_thi, r.command AS lenh_sudo_da_chay, r.last_seen AS thoi_gian; ---
+user_thuc_thi, lenh_sudo_da_chay, thoi_gian
+"jhall", "list", "2022-01-24T04:38:06Z"
+
+--- QUERY: MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE size(dns.rrname) > 40 WITH ip, count(q) AS dns_queries, collect(DISTINCT dns.rrname)[0..3] AS sample_domains WHERE dns_queries > 10 RETURN ip.ip AS may_chu_bi_nhiem, dns_queries AS so_luong_truy_van, sample_domains; ---
+may_chu_bi_nhiem, so_luong_truy_van, sample_domains
+"192.168.230.4", 20006, ["3x6-.877-.020*4VqmQOtn5X6GeCgfiLmScz**2ZNaMk-.471ygMsgaD8vY64q4LfhXI1FxvptivK6QP-.bT2g1buqJi/Q7nYnjLaBQKk5FUwVHxkpfm-.ppN5eoBaRLzSj0v5AY1L/xGBiJ/y3SSP05-.customers_2018.xlsx.email-19.kennedy-mendoza.info", "3x6-.878-.FM4IgB8ARM1J/Qv/LkuJkHlPiKd38XB7hG-.smuTfJfdcAxLvMG0LJn/NsnxuF9dwIOFiz-.xDkYttMfOH0bVsIc9ZdUOqATkPxvv7AUBD-.w91sW97ZKip04fVSBGkEzYtYr3ubcEK2QJ-.customers_2018.xlsx.email-19.kennedy-mendoza.info", "3x6-.879-.tNwMUKhnP3FzPqPTu/696QH7gEXau8Z37W-.EvF5U9lECnIhPLWTmEaX*rsLxJ5i6pCIm0-.37RbGlUu9pIjP3JuNiBtd97/yHoYFXrc*c-.7GyD89PJwkPUDWGAatttkaM40cQUPUY*68-.customers_2018.xlsx.email-19.kennedy-mendoza.info"]
+"10.143.0.103", 19889, ["3x6-.877-.020*4VqmQOtn5X6GeCgfiLmScz**2ZNaMk-.471ygMsgaD8vY64q4LfhXI1FxvptivK6QP-.bT2g1buqJi/Q7nYnjLaBQKk5FUwVHxkpfm-.ppN5eoBaRLzSj0v5AY1L/xGBiJ/y3SSP05-.customers_2018.xlsx.email-19.kennedy-mendoza.info", "3x6-.878-.FM4IgB8ARM1J/Qv/LkuJkHlPiKd38XB7hG-.smuTfJfdcAxLvMG0LJn/NsnxuF9dwIOFiz-.xDkYttMfOH0bVsIc9ZdUOqATkPxvv7AUBD-.w91sW97ZKip04fVSBGkEzYtYr3ubcEK2QJ-.customers_2018.xlsx.email-19.kennedy-mendoza.info", "3x6-.879-.tNwMUKhnP3FzPqPTu/696QH7gEXau8Z37W-.EvF5U9lECnIhPLWTmEaX*rsLxJ5i6pCIm0-.37RbGlUu9pIjP3JuNiBtd97/yHoYFXrc*c-.7GyD89PJwkPUDWGAatttkaM40cQUPUY*68-.customers_2018.xlsx.email-19.kennedy-mendoza.info"]
+"172.19.131.174", 69, ["dolphin-feature-flags-proxy-prod.jimdo-platform.net", "dolphin-featur-959dff-1596521323-137501366.eu-west-1.elb.amazonaws.com", "user-account-p-8faa37-1626855623-1732974328.eu-west-1.elb.amazonaws.com"]
+
+--- QUERY: MATCH (attacker:IPAddress)-[conn:CONNECTED_TO]->(target:Port) WITH attacker, count(DISTINCT target.number) AS ports_scanned, min(datetime(conn.last_seen)) AS start_time WHERE ports_scanned > 20 RETURN attacker.ip AS ip_quet_mang, ports_scanned AS so_cong_bi_quet, start_time; ---
+
+--- QUERY: MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code = 404 WITH ip, count(req) AS not_found_count WHERE not_found_count > 50 RETURN ip.ip AS attacker_ip, not_found_count AS so_lan_loi_404; ---
+attacker_ip, so_lan_loi_404
+"172.19.131.174", 7514
+
+--- QUERY: MATCH (ip:IPAddress)-[login:AUTHENTICATED]->(u:User) WHERE login.status = 'failed' AND login.service = 'sshd' WITH ip, u.username AS target_user, count(login) AS failed_attempts WHERE failed_attempts > 10 RETURN ip.ip AS attacker_ip, target_user, failed_attempts; ---
+
+--- QUERY: MATCH (u:User)-[exec:EXECUTED]->(p:Process) WHERE (p.cmdline CONTAINS 'systemctl stop' OR p.cmdline CONTAINS 'service') AND (p.cmdline CONTAINS 'audit' OR p.cmdline CONTAINS 'ufw' OR p.cmdline CONTAINS 'wazuh') RETURN u.username AS user_thuc_thi, p.cmdline AS lenh_tat_dich_vu, exec.last_seen AS thoi_gian; ---
+
+--- QUERY: MATCH (attacker:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.uri CONTAINS 'wp-login.php' WITH max(datetime(req.last_seen)) AS time_wpcrack MATCH (u:User {username: 'www-data'})-[su:RAN_AS {is_su: true}]->(p:Process) WITH time_wpcrack, u, su, p WHERE datetime(su.last_seen) > time_wpcrack AND duration.inSeconds(time_wpcrack, datetime(su.last_seen)).hours <= 2 RETURN u.username AS the_luc_xam_nhap, su.target_user AS nan_nhan; ---
+the_luc_xam_nhap, nan_nhan
+"www-data", "jhall"
+
+--- QUERY: MATCH (u:User {username: 'jhall'})-[r_sudo:RAN_AS {is_sudo: true}]->(p:Process) WITH max(datetime(r_sudo.last_seen)) AS time_sudo MATCH (internal_ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE size(dns.rrname) > 40 AND datetime(q.last_seen) > time_sudo AND duration.inSeconds(time_sudo, datetime(q.last_seen)).hours <= 1 WITH internal_ip, time_sudo, count(q) AS dns_count WHERE dns_count > 5 RETURN internal_ip.ip AS may_chu_ro_ri, time_sudo AS thoi_gian_danh_cap, dns_count; ---
+may_chu_ro_ri, thoi_gian_danh_cap, dns_count
+"192.168.230.4", 2022-01-24T04:38:06Z, 418
+"10.143.0.103", 2022-01-24T04:38:06Z, 418
+

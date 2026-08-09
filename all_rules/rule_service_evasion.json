@@ -1,0 +1,17 @@
+{
+  "rule_id": "RULE_SERVICE_EVASION",
+  "rule_name": "Defense Evasion (Service Stop)",
+  "enabled": true,
+  "trigger_source": "syslog",
+  "tree": {
+    "id": "L1_SERVICE_STOP",
+    "name": "T\u1eaft d\u1ecbch v\u1ee5 b\u1ea3o m\u1eadt",
+    "severity": "CRITICAL",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[exec:EXECUTED]->(p:Process) WHERE (p.command CONTAINS 'stop' OR p.command CONTAINS 'disable' OR p.command CONTAINS 'kill') AND (p.command CONTAINS 'wazuh' OR p.command CONTAINS 'suricata' OR p.command CONTAINS 'audit' OR p.command CONTAINS 'syslog' OR p.command CONTAINS 'service') RETURN u.username AS evader, p.command AS stop_cmd, toString(max(datetime(exec.last_seen))) AS time_stop LIMIT 5",
+    "on_match": {
+      "alert_message": "\ud83d\udca5 [CRITICAL] C\u1ea2NH B\u00c1O \u0110\u1ece: T\u00e0i kho\u1ea3n {evader} \u0111ang c\u1ed1 t\u1eaft d\u1ecbch v\u1ee5 b\u1eb1ng l\u1ec7nh '{stop_cmd}' l\u00fac {time_stop}!",
+      "next": []
+    }
+  }
+}

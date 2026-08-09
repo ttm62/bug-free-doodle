@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,8 +12,45 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
+
+var (
+	alertCache    map[string]time.Time
+	alertCacheMu  sync.RWMutex
+	alertCacheTTL = 24 * time.Hour
+)
+
+func initAlertCache() {
+	alertCacheMu.Lock()
+	defer alertCacheMu.Unlock()
+	alertCache = make(map[string]time.Time)
+}
+
+func generateAlertHash(ruleID, nodeID string, details map[string]interface{}) string {
+	b, _ := json.Marshal(details)
+	hash := sha256.Sum256(b)
+	return fmt.Sprintf("%s:%s:%x", ruleID, nodeID, hash)
+}
+
+func isDuplicateAlert(hash string) bool {
+	if alertCache == nil {
+		return false // Cache not initialized
+	}
+	alertCacheMu.RLock()
+	lastSeen, exists := alertCache[hash]
+	alertCacheMu.RUnlock()
+
+	if exists && time.Since(lastSeen) < alertCacheTTL {
+		return true
+	}
+
+	alertCacheMu.Lock()
+	alertCache[hash] = time.Now()
+	alertCacheMu.Unlock()
+	return false
+}
 
 type RuleTree struct {
 	ID        string      `json:"id"`
@@ -218,41 +256,46 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 	alertCount := 0
 
 	for _, row := range results {
-		formattedMsg := formatAlertMessage(node.OnMatch.AlertMessage, row)
+		fullDetails := make(map[string]interface{})
+		for k, v := range parentParams {
+			fullDetails[k] = v
+		}
+		for k, v := range row {
+			fullDetails[k] = v
+		}
+
+		formattedMsg := formatAlertMessage(node.OnMatch.AlertMessage, fullDetails)
 
 		if shouldEmit {
-			alertCount++
-			fmt.Printf("%s%s\n", indent, formattedMsg)
+			alertHash := generateAlertHash(rule.RuleID, node.ID, fullDetails)
+			if !isDuplicateAlert(alertHash) {
+				alertCount++
+				fmt.Printf("%s%s\n", indent, formattedMsg)
 
-			if alertEncoder != nil {
-				alertObj := DetectionAlert{
-					Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
-					RuleID:       rule.RuleID,
-					RuleName:     rule.RuleName,
-					NodeID:       node.ID,
-					NodeName:     node.Name,
-					Severity:     node.Severity,
-					Depth:        depth,
-					AlertMessage: formattedMsg,
-					Details:      row,
+				if alertEncoder != nil {
+					alertObj := DetectionAlert{
+						Timestamp:    time.Now().UTC().Format(time.RFC3339Nano),
+						RuleID:       rule.RuleID,
+						RuleName:     rule.RuleName,
+						NodeID:       node.ID,
+						NodeName:     node.Name,
+						Severity:     node.Severity,
+						Depth:        depth,
+						AlertMessage: formattedMsg,
+						Details:      fullDetails,
+					}
+					_ = alertEncoder.Encode(alertObj)
+					if alertWriter != nil {
+						_ = alertWriter.Flush()
+					}
 				}
-				_ = alertEncoder.Encode(alertObj)
-				if alertWriter != nil {
-					_ = alertWriter.Flush()
-				}
+			} else {
+				// Duplicate alert, suppressed
 			}
 		}
 
-		childParams := make(map[string]interface{})
-		for k, v := range parentParams {
-			childParams[k] = v
-		}
-		for k, v := range row {
-			childParams[k] = v
-		}
-
 		for _, childNode := range node.OnMatch.Next {
-			alertCount += evaluateRuleTreeNode(url, user, pass, rule, childNode, childParams, depth+1, minSeverityLevel, alertEncoder, alertWriter)
+			alertCount += evaluateRuleTreeNode(url, user, pass, rule, childNode, fullDetails, depth+1, minSeverityLevel, alertEncoder, alertWriter)
 		}
 	}
 	return alertCount

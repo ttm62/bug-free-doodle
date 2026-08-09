@@ -1,0 +1,17 @@
+{
+  "rule_id": "RULE_CRACKING",
+  "rule_name": "Password Cracking Phase",
+  "enabled": true,
+  "trigger_source": "auth_log",
+  "tree": {
+    "id": "L1_SSH_CRACK",
+    "name": "D\u00f2 m\u1eadt kh\u1ea9u SSH/H\u1ec7 th\u1ed1ng",
+    "severity": "MEDIUM",
+    "emit_alert": true,
+    "query": "MATCH (u:User)-[fail:AUTHENTICATED_ON {status: 'failed'}]->(ip:IPAddress) WITH ip, u, count(fail) AS fails, max(datetime(fail.last_seen)) AS time_cracking WHERE fails > 5 RETURN ip.ip AS attacker_ip, u.username AS target_user, fails, toString(time_cracking) AS time_cracking LIMIT 5",
+    "on_match": {
+      "alert_message": "\ud83d\udea8 [MEDIUM] IP {attacker_ip} li\u00ean t\u1ee5c d\u00f2 m\u1eadt kh\u1ea9u t\u00e0i kho\u1ea3n {target_user} ({fails} l\u1ea7n) l\u00fac {time_cracking}",
+      "next": []
+    }
+  }
+}
