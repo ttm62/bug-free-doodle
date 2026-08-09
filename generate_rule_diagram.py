@@ -4,28 +4,27 @@ import os
 import re
 import argparse
 
-def extract_condition(query):
+def extract_query_logic(query):
     if not query:
-        return "Điều kiện tương quan"
+        return ""
     
-    label_parts = []
-    
-    # Lấy vế WHERE
-    if "WHERE " in query:
-        where_part = query.split("WHERE ")[1].split("RETURN")[0].split("WITH")[0].strip()
-        where_part = where_part.replace('"', "'")
+    lines = []
+    # Extract MATCH
+    if "MATCH " in query:
+        match_part = query.split("MATCH ")[1].split(" WHERE")[0].split(" RETURN")[0].split(" WITH")[0].strip()
+        match_part = match_part.replace('"', "'")
+        lines.append(f"🔍 MẪU: {match_part}")
         
-        # Cắt ngắn thành từng dòng 60 ký tự để biểu đồ không bị bè ra quá to
+    # Extract WHERE
+    if "WHERE " in query:
+        where_part = query.split("WHERE ")[1].split(" RETURN")[0].split(" WITH")[0].strip()
+        where_part = where_part.replace('"', "'")
+        # Chia dòng ngắn lại nếu WHERE quá dài
         chunks = [where_part[i:i+60] for i in range(0, len(where_part), 60)]
-        if len(chunks) > 3:
-            where_part = "<br/>".join(chunks[:3]) + "..."
-        else:
-            where_part = "<br/>".join(chunks)
-            
-        label = f"📝 ĐIỀU KIỆN:<br/>{where_part}"
-        return label
-    
-    return "Đã thỏa mãn ràng buộc trước đó"
+        where_part = "<br/>&nbsp;&nbsp;&nbsp;&nbsp;".join(chunks)
+        lines.append(f"⚙️ LỌC: {where_part}")
+        
+    return "<br/>".join(lines)
 
 def build_mermaid(node, parent_id=None, level=1):
     mermaid_lines = []
@@ -41,15 +40,22 @@ def build_mermaid(node, parent_id=None, level=1):
     node_id = node.get("id")
     node_name = node.get("name").replace('"', "'")
     
-    # Wrap subgraph label in quotes to avoid mermaid parsing errors with special chars like (, ), /
-    mermaid_lines.append(f'    subgraph Layer{level} ["Lớp {level}: {node_name}"]')
-    mermaid_lines.append(f'        {node_id}["{node_id}"]:::{sev_class}')
+    query = node.get("query", "")
+    logic_html = extract_query_logic(query)
+    
+    if logic_html:
+        node_label = f"<b>{node_name}</b><br/><hr/><i>{logic_html}</i>"
+    else:
+        node_label = f"<b>{node_name}</b>"
+    
+    # Wrap subgraph label in quotes to avoid mermaid parsing errors
+    mermaid_lines.append(f'    subgraph Layer_{node_id} ["Lớp {level}"]')
+    mermaid_lines.append(f'        {node_id}["{node_label}"]:::{sev_class}')
     mermaid_lines.append(f'    end')
     
     if parent_id:
-        query = node.get("query", "")
-        edge_label = extract_condition(query)
-        mermaid_lines.append(f'    {parent_id} -->|"{edge_label}"| {node_id}')
+        # Đường nối đơn giản, gỡ bỏ chữ trên Edge để đồ thị thoáng hơn
+        mermaid_lines.append(f'    {parent_id} ==> {node_id}')
         
     next_nodes = node.get("on_match", {}).get("next", [])
     for n in next_nodes:

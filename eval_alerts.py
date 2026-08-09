@@ -64,12 +64,15 @@ def main():
         for gt in gt_stats:
             lbl = gt["label"].upper()
             
-            # Check Time Match
+            # Check Time Match (Strict)
             time_match = (gt["start"] <= ts <= gt["end"])
             
-            # Check Semantic Match
+            # Check Semantic Match with Time Drift (Max 24 hours)
+            # Khắc phục lỗi match chéo kịch bản: Chỉ chấp nhận Semantic nếu sai số thời gian không quá 24h
+            time_drift_allowed = (gt["start"] - 86400 <= ts <= gt["end"] + 86400)
+            
             semantic_match = False
-            if lbl in keyword_map:
+            if time_drift_allowed and lbl in keyword_map:
                 for kw in keyword_map[lbl]:
                     if kw.lower() in name_lower:
                         semantic_match = True
