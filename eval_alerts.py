@@ -82,7 +82,6 @@ def main():
                 gt["hit_count"] += 1
                 match_type = "TEXT" if not time_match else ("TIME+TEXT" if semantic_match else "TIME")
                 
-                # Để báo cáo gọn hơn, chỉ lấy tên gốc
                 if node_name not in gt["alerts"]:
                     gt["alerts"].append(node_name)
                     
@@ -92,12 +91,11 @@ def main():
 
     def extract_real_time(alert):
         details = alert.get('details', {})
-        # Ưu tiên lấy từ details nếu có định dạng ISO 202x
+        
         for k, v in details.items():
             if isinstance(v, str) and '202' in v and 'T' in v:
                 return v
                 
-        # Nếu không có trong details, dùng Regex tìm trong alert_message
         msg = alert.get('alert_message', '')
         match = re.search(r'(202\d-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)', msg)
         if match:
@@ -118,12 +116,10 @@ def main():
                     
                 node_name = alert.get('node_name', 'Unknown')
                 
-                # Bóc tách chính xác thời gian 2022 của tập dữ liệu
                 time_str = extract_real_time(alert)
                 
                 if time_str:
                     try:
-                        # Đảm bảo format đúng trước khi parse
                         clean_time = time_str[:19]
                         dt = datetime.strptime(clean_time, "%Y-%m-%dT%H:%M:%S")
                         dt = dt.replace(tzinfo=timezone.utc)

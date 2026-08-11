@@ -126,10 +126,15 @@ func (s *neo4jSink) flush() error {
 
 	resp, err := s.client.Do(req)
 	if err != nil {
+		return fmt.Errorf("network error connecting to Neo4j at %s: %w", endpoint, err)
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		resp.Body.Close() // Close previous response body before making a new request
 		endpointLegacy := s.url + "/db/data/transaction/commit"
 		reqLegacy, errLeg := http.NewRequest("POST", endpointLegacy, bytes.NewBuffer(jsonBytes))
 		if errLeg != nil {
-			return err
+			return errLeg
 		}
 		reqLegacy.Header.Set("Content-Type", "application/json")
 		if s.user != "" && s.pass != "" {
@@ -138,8 +143,9 @@ func (s *neo4jSink) flush() error {
 		}
 		resp, err = s.client.Do(reqLegacy)
 		if err != nil {
-			return fmt.Errorf("failed to connect to Neo4j at %s: %w", s.url, err)
+			return fmt.Errorf("failed to connect to Neo4j legacy endpoint at %s: %w", s.url, err)
 		}
+		endpoint = endpointLegacy // Update endpoint for accurate error logging
 	}
 	defer resp.Body.Close()
 

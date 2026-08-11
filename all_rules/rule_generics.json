@@ -18,7 +18,7 @@
   },
   {
     "rule_id": "GENERIC_SSH_PERSISTENCE",
-    "rule_name": "Phát hiện chung: Cấy khóa SSH trái phép (SSH Persistence)",
+    "rule_name": "SSH Persistence",
     "enabled": true,
     "trigger_source": "syslog",
     "tree": {
@@ -45,7 +45,7 @@
       "emit_alert": true,
       "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WITH ip, count(req) AS req_count, max(datetime(req.last_seen)) AS last_req WHERE req_count > 5000 RETURN ip.ip AS attacker_ip, req_count, toString(last_req) AS time_ddos ",
       "on_match": {
-        "alert_message": "🚨 [HIGH] BÁO ĐỘNG DoS/DDoS: IP {attacker_ip} đang dội bom máy chủ với {req_count} HTTP Requests. Dấu hiệu HTTP Flood! Lần cuối lúc {time_ddos}",
+        "alert_message": "🚨 [HIGH] DoS/DDoS: IP {attacker_ip} đang tấn công máy chủ với {req_count} HTTP Requests. Lần cuối lúc {time_ddos}",
         "next": []
       }
     }
@@ -62,7 +62,7 @@
       "emit_alert": true,
       "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE size(dns.rrname) > 30 RETURN ip.ip AS attacker_ip, toString(max(datetime(q.last_seen))) AS time_dnsteal ",
       "on_match": {
-        "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS độc lập từ {attacker_ip}!",
+        "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS từ {attacker_ip}!",
         "next": []
       }
     }
@@ -79,7 +79,7 @@
       "emit_alert": true,
       "query": "MATCH (u:User)-[r:RAN_AS]->(p:Process) WHERE r.is_su = true OR r.is_sudo = true OR r.target_user = 'root' RETURN u.username AS user, toString(datetime(r.last_seen)) AS time_privesc",
       "on_match": {
-        "alert_message": "🚨 [HIGH] Phát hiện leo quyền độc lập từ user {user}!",
+        "alert_message": "🚨 [HIGH] Phát hiện leo quyền từ user {user}!",
         "next": []
       }
     }
@@ -96,7 +96,7 @@
       "emit_alert": true,
       "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code = 401 OR http.status_code = 403 OR http.status_code = 404 WITH ip, count(req) AS failed_auths, max(datetime(req.last_seen)) AS time_cracking WHERE failed_auths > 20 RETURN ip.ip AS attacker_ip, failed_auths AS fails, toString(time_cracking) AS time_cracking ",
       "on_match": {
-        "alert_message": "🚨 [MEDIUM] IP {attacker_ip} liên tục gặp lỗi xác thực/truy cập Web ({fails} lần) lúc {time_cracking} (Nghi ngờ Cracking)",
+        "alert_message": "🚨 [MEDIUM] IP {attacker_ip} liên tục gặp lỗi xác thực/truy cập Web ({fails} lần) lúc {time_cracking} (Cracking)",
         "next": []
       }
     }

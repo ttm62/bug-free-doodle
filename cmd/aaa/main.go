@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"container/heap"
 	"flag"
 	"fmt"
@@ -77,14 +78,34 @@ func advanceReplaySource(source *ReplaySource) {
 	}
 }
 
-func loadReplaySources(workDir string, folder string) ([]ReplaySource, error) {
+func countLinesFast(filepath string) int {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return 0
+	}
+	defer file.Close()
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+	for {
+		c, err := file.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+		if err != nil {
+			break
+		}
+	}
+	return count
+}
+
+func loadReplaySources(workDir string, folder string) ([]ReplaySource, int, error) {
 	var sources []ReplaySource
+	totalLines := 0
 
 	for _, pattern := range patterns {
 		globPattern := filepath.Join(workDir, folder, pattern.Pattern)
 		matches, err := filepath.Glob(globPattern)
 		if err != nil {
-			return nil, fmt.Errorf("invalid glob pattern %s: %w", globPattern, err)
+			return nil, 0, fmt.Errorf("invalid glob pattern %s: %w", globPattern, err)
 		}
 
 		parser := getParser(pattern.LogType)
@@ -103,13 +124,14 @@ func loadReplaySources(workDir string, folder string) ([]ReplaySource, error) {
 
 			if src.HasCurrentLine {
 				sources = append(sources, src)
+				totalLines += countLinesFast(path)
 			} else {
 				src.File.Close()
 			}
 		}
 	}
 
-	return sources, nil
+	return sources, totalLines, nil
 }
 
 func pushCurrentLine(source *ReplaySource, sourceIndex int, heapObj *EntryHeap) {
@@ -148,9 +170,10 @@ func main() {
 	neo4jUser := flag.String("neo4j-user", defaultNeo4jUser, "Neo4j username")
 	neo4jPass := flag.String("neo4j-pass", defaultNeo4jPass, "Neo4j password")
 	rulesPath := flag.String("rules", "rules", "JSON Decision Tree rules file or directory path when -mode detect or webhook")
-	rateLimit := flag.Float64("rate", defaultRate, "Maximum log events per second to process (replay speed limit)")
 	webhookPort := flag.Int("webhook-port", 5050, "Port for webhook server when -mode webhook")
 	scanInterval := flag.Int("scan-interval", 60, "Interval in seconds to run detection scan when -mode webhook")
+
+	skipEvents := flag.Int("skip", 0, "Number of log events to skip before processing")
 
 	flag.Parse()
 
@@ -170,13 +193,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	sources, err := loadReplaySources(*work_dir, *datasetFolder)
+	sources, totalLines, err := loadReplaySources(*work_dir, *datasetFolder)
 	if err != nil {
 		fmt.Printf("[!] Failed to load replay sources: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("[+] Loaded %d log files across replay sources.\n", len(sources))
+	fmt.Printf("[+] Loaded %d log files (Total: %d lines) across replay sources.\n", len(sources), totalLines)
 
 	startTime := time.Now()
 
@@ -188,25 +211,29 @@ func main() {
 	}
 
 	processedCount := 0
-	var ticker *time.Ticker
-
-	if *rateLimit > 0 {
-		interval := time.Duration(float64(time.Second) / *rateLimit)
-		if interval <= 0 {
-			interval = time.Nanosecond
-		}
-		ticker = time.NewTicker(interval)
-		defer ticker.Stop()
-	}
 
 	for h.Len() > 0 {
-		if ticker != nil {
-			<-ticker.C
+		entry := heap.Pop(h).(ReplayEntry)
+		src := &sources[entry.SourceIndex]
+
+		processedCount++
+
+		if processedCount <= *skipEvents {
+			if processedCount%1000 == 0 {
+				fmt.Print(".")
+			}
+			if processedCount == *skipEvents {
+				fmt.Printf("\n[*] Finished skipping %d events.\n", *skipEvents)
+			}
+			advanceReplaySource(src)
+			if src.HasCurrentLine {
+				pushCurrentLine(src, entry.SourceIndex, h)
+			} else {
+				src.File.Close()
+			}
+			continue
 		}
 
-		entry := heap.Pop(h).(ReplayEntry)
-
-		src := &sources[entry.SourceIndex]
 		outEvent := OutputEvent{
 			Timestamp:     entry.Timestamp.Format(time.RFC3339Nano),
 			LogType:       src.LogType,
@@ -221,7 +248,6 @@ func main() {
 			fmt.Printf("[!] Sink write error: %v\n", err)
 		}
 
-		processedCount++
 		if processedCount%2000 == 0 {
 			fmt.Printf("[*] Processed %d log events into provenance graph... (Elapsed: %v)\n", processedCount, time.Since(startTime))
 		}

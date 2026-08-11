@@ -37,7 +37,7 @@ def extract_entities_from_line(log_line):
     # Trích xuất File/Artifact độc hại (Webshell, Data Exfil)
     files = re.findall(r'[a-zA-Z0-9_\-\.]+\.(?:php|xlsx|tar\.gz|zip|sh|bash)\b', log_line)
     
-    # Trích xuất Command (Đặc biệt từ sudo, bash, python, wget, curl)
+    # Trích xuất Command (sudo, bash, python, wget, curl)
     commands = []
     cmd_match = re.search(r'COMMAND=(/.+)', log_line)
     if cmd_match:
@@ -54,7 +54,6 @@ def extract_entities_from_line(log_line):
     if 'systemd' in log_line and 'Started' in log_line:
         commands.append('/lib/systemd/systemd')
     
-    # Có thể bắt thêm HTTP request path cho webshell
     http_match = re.search(r'(?:GET|POST) (/.*?(?:\.php|\?cmd=)) ', log_line)
     if http_match:
         files.append(http_match.group(1))
@@ -87,14 +86,14 @@ def main():
         if not label_file.is_file():
             continue
 
-        # Tìm đường dẫn file log thô tương ứng trong thư mục gather/
+        # Tìm đường dẫn file log trong thư mục gather/
         rel_path = label_file.relative_to(labels_dir)
         raw_log_file = gather_dir / rel_path
 
         if not raw_log_file.exists():
             continue
 
-        # Load file log thô vào bộ nhớ (để truy xuất dòng nhanh)
+        # Load file log vào bộ nhớ (truy xuất dòng nhanh)
         with open(raw_log_file, 'r', encoding='utf-8', errors='ignore') as f:
             raw_lines = f.readlines()
 
@@ -119,37 +118,34 @@ def main():
                     continue
 
     print("========================================")
-    print("🎯 CÁC THỰC THỂ GROUND TRUTH TÌM ĐƯỢC:")
+    print("CÁC THỰC THỂ GROUND TRUTH:")
     print("========================================")
     
-    print("\n🌐 IPs (Bao gồm Attacker & Target):")
+    print("\nIPs (Bao gồm Attacker & Target):")
     for ip in sorted(extracted_entities["Attacker_IPs"]):
         print(f"  - {ip}")
 
-    print("\n👤 Users (Tài khoản bị xâm phạm / Sử dụng trái phép):")
+    print("\nUsers:")
     for user in sorted(extracted_entities["Compromised_Users"]):
-        # Bỏ qua một số user hệ thống mặc định nếu bắt nhầm
         if user not in ["root"]: 
             print(f"  - {user}")
         if user == "root":
             print(f"  - root (Leo quyền thành công)")
             
-    print("\n📁 Files / Artifacts (Tệp bị đánh cắp / Webshell tải lên):")
+    print("\nFiles / Artifacts:")
     for f in sorted(extracted_entities["Malicious_Files"]):
         print(f"  - {f}")
 
-    print("\n⚙️ Commands (Lệnh thực thi độc hại):")
+    print("\nCommands:")
     for cmd in sorted(extracted_entities["Malicious_Commands"]):
         print(f"  - {cmd}")
             
     output_file = f"{scenario_dir.name}_entities.json"
     with open(output_file, 'w', encoding='utf-8') as f:
-        # Chuyển set thành list để dump JSON
         json_data = {k: sorted(list(v)) for k, v in extracted_entities.items()}
         json.dump(json_data, f, indent=4, ensure_ascii=False)
         
-    print(f"\n✅ Đã lưu toàn bộ danh sách thực thể ra file: {output_file}\n")
-    print("\n(Bạn có thể so sánh danh sách này với kết quả 'attacker_ip_l2', 'shell_cmd' và 'webshell_uri' của hệ thống Neo4j)\n")
+    print(f"\n✅ {output_file}\n")
 
 if __name__ == "__main__":
     main()

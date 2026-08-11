@@ -59,7 +59,7 @@ def main():
     # Convert to DataFrame
     df = pd.DataFrame(data)
 
-    # In ra bảng thống kê chi tiết Min/Max/Avg/Std để đưa vào báo cáo Word
+    # thống kê chi tiết Min/Max/Avg/Std
     print("="*80)
     print(f"{'LUẬT':<80} | {'SỐ LƯỢNG':<10} | {'MIN':<8} | {'MAX':<8} | {'AVG (Mean)':<12} | {'STD'}")
     print("="*80)
@@ -100,9 +100,9 @@ def main():
         size=4, color=".3", linewidth=0, alpha=0.5
     )
 
-    plt.title('Phân bố Thời gian Thực thi Cypher (Min/Max/Avg/Std) theo từng Lớp', fontsize=16, fontweight='bold', pad=20)
-    plt.xlabel('Thời gian thực thi - Execution Time (ms)', fontsize=14, fontweight='bold')
-    plt.ylabel('Luật phát hiện & Lớp (Depth)', fontsize=14, fontweight='bold')
+    plt.title('Phân bố Thời gian Thực thi Cypher theo từng Lớp', fontsize=16, fontweight='bold', pad=20)
+    plt.xlabel('Execution Time (ms)', fontsize=14, fontweight='bold')
+    plt.ylabel('Lớp (Depth)', fontsize=14, fontweight='bold')
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=10)
 
@@ -111,7 +111,7 @@ def main():
 
     plt.tight_layout()
     plt.savefig(OUTPUT_IMAGE, dpi=300, bbox_inches='tight')
-    print(f"✅ Đã vẽ xong biểu đồ Hộp (Box Plot) và lưu tại: {OUTPUT_IMAGE}")
+    print(f"✅ {OUTPUT_IMAGE}")
 
 if __name__ == "__main__":
     main()

@@ -3,28 +3,31 @@ import glob
 import os
 import re
 import argparse
+import textwrap
 
 def extract_query_logic(query):
     if not query:
         return ""
-    
-    lines = []
-    # Extract MATCH
-    if "MATCH " in query:
-        match_part = query.split("MATCH ")[1].split(" WHERE")[0].split(" RETURN")[0].split(" WITH")[0].strip()
-        match_part = match_part.replace('"', "'")
-        lines.append(f"🔍 MẪU: {match_part}")
+    # Format Cypher query nicely for markdown block
+    formatted = query.replace(" WHERE ", "\nWHERE ").replace(" RETURN ", "\nRETURN ").replace(" AND ", "\n  AND ")
+    return formatted
+
+def extract_queries_markdown(node, level=1):
+    md_lines = []
+    node_name = node.get("name")
+    query = node.get("query", "")
+    if query:
+        md_lines.append(f"**Lớp {level}: {node_name}**")
+        md_lines.append("```cypher")
+        md_lines.append(format_cypher(query))
+        md_lines.append("```")
+        md_lines.append("")
         
-    # Extract WHERE
-    if "WHERE " in query:
-        where_part = query.split("WHERE ")[1].split(" RETURN")[0].split(" WITH")[0].strip()
-        where_part = where_part.replace('"', "'")
-        # Chia dòng ngắn lại nếu WHERE quá dài
-        chunks = [where_part[i:i+60] for i in range(0, len(where_part), 60)]
-        where_part = "<br/>&nbsp;&nbsp;&nbsp;&nbsp;".join(chunks)
-        lines.append(f"⚙️ LỌC: {where_part}")
+    next_nodes = node.get("on_match", {}).get("next", [])
+    for n in next_nodes:
+        md_lines.extend(extract_queries_markdown(n, level + 1))
         
-    return "<br/>".join(lines)
+    return md_lines
 
 def build_mermaid(node, parent_id=None, level=1):
     mermaid_lines = []
@@ -40,13 +43,7 @@ def build_mermaid(node, parent_id=None, level=1):
     node_id = node.get("id")
     node_name = node.get("name").replace('"', "'")
     
-    query = node.get("query", "")
-    logic_html = extract_query_logic(query)
-    
-    if logic_html:
-        node_label = f"<b>{node_name}</b><br/><hr/><i>{logic_html}</i>"
-    else:
-        node_label = f"<b>{node_name}</b>"
+    node_label = f"<b>{node_name}</b>"
     
     # Wrap subgraph label in quotes to avoid mermaid parsing errors
     mermaid_lines.append(f'    subgraph Layer_{node_id} ["Lớp {level}"]')
@@ -54,7 +51,6 @@ def build_mermaid(node, parent_id=None, level=1):
     mermaid_lines.append(f'    end')
     
     if parent_id:
-        # Đường nối đơn giản, gỡ bỏ chữ trên Edge để đồ thị thoáng hơn
         mermaid_lines.append(f'    {parent_id} ==> {node_id}')
         
     next_nodes = node.get("on_match", {}).get("next", [])
@@ -107,8 +103,11 @@ def main():
             if tree:
                 lines = build_mermaid(tree)
                 readme_content += "\n".join(lines) + "\n"
+                readme_content += "```\n\n"
                 
-            readme_content += "```\n\n"
+                readme_content += "#### Chi tiết câu lệnh Cypher (Logic Detection)\n"
+                query_lines = extract_queries_markdown(tree)
+                readme_content += "\n".join(query_lines) + "\n"
 
     readme_path = os.path.join(folder, 'README.md')
     with open(readme_path, 'w', encoding='utf-8') as f:

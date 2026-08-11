@@ -28,7 +28,7 @@
                 "emit_alert": true,
                 "query": "MATCH (p_web:Process)-[s:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache' OR p_web.exe CONTAINS 'nginx' OR p_web.exe CONTAINS 'php') AND (p_shell.exe CONTAINS 'bash' OR p_shell.exe CONTAINS 'sh' OR p_shell.exe CONTAINS 'nc' OR p_shell.exe CONTAINS 'python' OR p_shell.exe CONTAINS 'perl' OR p_shell.comm CONTAINS 'sh' OR p_shell.comm CONTAINS 'bash') AND datetime(s.timestamp) >= datetime($time_webshell) - duration('PT1H') RETURN p_shell.exe AS shell_cmd, p_shell.pid AS shell_pid, toString(max(datetime(s.timestamp))) AS time_revshell LIMIT 5",
                 "on_match": {
-                  "alert_message": "💥 [CRITICAL] MÃ ĐỘC THỰC THI: Webshell từ {attacker_ip_l2} đã kích hoạt {shell_cmd} (PID {shell_pid}) lúc {time_revshell}!",
+                  "alert_message": "💥 [CRITICAL] Webshell từ {attacker_ip_l2} đã kích hoạt {shell_cmd} (PID {shell_pid}) lúc {time_revshell}!",
                   "next": []
                 }
               }

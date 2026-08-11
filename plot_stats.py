@@ -8,8 +8,8 @@ import statistics
 LOG_FILE = "query_stats.log"
 OUTPUT_IMAGE = "query_stats_chart.png"
 
-# Regex pattern to parse the log lines
-# Example: [2026-08-03T17:44:09+07:00] RuleID: GENERIC_CRYPTOMINER | Depth: 1 | Node: Nhận diện tiến trình đào coin | Time: 326ms
+# Regex to parse the log lines
+# Vd: [2026-08-03T17:44:09+07:00] RuleID: GENERIC_CRYPTOMINER | Depth: 1 | Node: Nhận diện tiến trình đào coin | Time: 326ms
 pattern = re.compile(r'\[.*?\] RuleID: (.*?) \| Depth: (\d+) \| Node: (.*?) \| Time: (.*)')
 
 def parse_time(time_str):
@@ -94,7 +94,7 @@ def main():
 
     plt.tight_layout()
     plt.savefig(OUTPUT_IMAGE, dpi=300, bbox_inches='tight')
-    print(f"✅ Đã vẽ xong đồ thị trung bình theo từng Lớp và lưu tại: {OUTPUT_IMAGE}")
+    print(f"✅ {OUTPUT_IMAGE}")
 
 if __name__ == "__main__":
     main()
