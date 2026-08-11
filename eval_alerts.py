@@ -67,9 +67,9 @@ def main():
             # Check Time Match (Strict)
             time_match = (gt["start"] <= ts <= gt["end"])
             
-            # Check Semantic Match with Time Drift (Max 24 hours)
-            # Khắc phục lỗi match chéo kịch bản: Chỉ chấp nhận Semantic nếu sai số thời gian không quá 24h
-            time_drift_allowed = (gt["start"] - 86400 <= ts <= gt["end"] + 86400)
+            # Check Semantic Match with Time Drift
+            # Chỉ chấp nhận Semantic nếu sai số thời gian không quá 1 giờ
+            time_drift_allowed = (gt["start"] - 3600 <= ts <= gt["end"] + 3600)
             
             semantic_match = False
             if time_drift_allowed and lbl in keyword_map:

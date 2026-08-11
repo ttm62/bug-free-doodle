@@ -125,6 +125,16 @@ func loadRulesFromPath(rulesPath string) ([]DetectionRule, error) {
 		if err != nil {
 			continue
 		}
+		var ruleArray []DetectionRule
+		if err := json.Unmarshal(data, &ruleArray); err == nil {
+			for _, r := range ruleArray {
+				if r.Enabled {
+					rules = append(rules, r)
+				}
+			}
+			continue
+		}
+
 		var rule DetectionRule
 		if err := json.Unmarshal(data, &rule); err == nil && rule.Enabled {
 			rules = append(rules, rule)

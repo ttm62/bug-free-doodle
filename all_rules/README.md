@@ -36,8 +36,8 @@ graph TD
     L1_SENSITIVE_ACCESS ==> L2_SHADOW_EXFILTRATION
 ```
 
-## GENERIC_DATA_STAGING: Phát hiện chung: Đóng gói dữ liệu chuẩn bị tuồn ra ngoài (Data Staging)
-**File:** `rule_generic_data_staging.json`
+## GENERIC_ROOTKIT_MODULE: Phát hiện chung: Tải Module Nhân hệ điều hành (Rootkit/Kernel Module)
+**File:** `rule_generics_combined.json`
 
 ```mermaid
 graph TD
@@ -46,13 +46,13 @@ graph TD
     classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
     classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
 
-    subgraph Layer_L1_ARCHIVE_DATA ["Lớp 1"]
-        L1_ARCHIVE_DATA["<b>Nén dữ liệu dung lượng lớn</b><br/><hr/><i>🔍 MẪU: (u:User)-[exec:EXECUTED]->(p:Process)-[w:WRITE]->(f:File)<br/>⚙️ LỌC: p.exe IN ['tar', 'zip', 'rar', '7z', 'gzip'] AND (f.path CON<br/>&nbsp;&nbsp;&nbsp;&nbsp;TAINS '/tmp/' OR f.path CONTAINS '/dev/shm/' OR f.path CONTA<br/>&nbsp;&nbsp;&nbsp;&nbsp;INS '/var/tmp/')</i>"]:::medium
+    subgraph Layer_L1_KERNEL_MODULE_LOAD ["Lớp 1"]
+        L1_KERNEL_MODULE_LOAD["<b>Nhận diện lệnh insmod/modprobe</b><br/><hr/><i>🔍 MẪU: (u:User)-[exec:EXECUTED]->(p:Process)<br/>⚙️ LỌC: p.exe IN ['insmod', 'modprobe', '/sbin/insmod', '/sbin/modpr<br/>&nbsp;&nbsp;&nbsp;&nbsp;obe']</i>"]:::high
     end
 ```
 
-## GENERIC_DDOS_HTTP: Phát hiện chung: Tấn công từ chối dịch vụ (DoS/DDoS) qua HTTP
-**File:** `rule_generic_ddos.json`
+## GENERIC_SSH_PERSISTENCE: Phát hiện chung: Cấy khóa SSH trái phép (SSH Persistence)
+**File:** `rule_generics_combined.json`
 
 ```mermaid
 graph TD
@@ -61,13 +61,13 @@ graph TD
     classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
     classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
 
-    subgraph Layer_L1_HTTP_FLOOD ["Lớp 1"]
-        L1_HTTP_FLOOD["<b>Nhận diện Flood Requests</b><br/><hr/><i>🔍 MẪU: (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest)<br/>⚙️ LỌC: req_count > 5000</i>"]:::high
+    subgraph Layer_L1_AUTH_KEYS_MOD ["Lớp 1"]
+        L1_AUTH_KEYS_MOD["<b>Thay đổi Authorized Keys</b><br/><hr/><i>🔍 MẪU: (p:Process)-[w:WRITE]->(f:File)<br/>⚙️ LỌC: f.path CONTAINS '.ssh/authorized_keys'</i>"]:::high
     end
 ```
 
 ## GENERIC_FIM_PERSISTENCE: Phát hiện chung: Mã độc chạy ngầm -> Sửa đổi file hệ thống -> Gọi về máy chủ C2
-**File:** `rule_generic_fim_persistence.json`
+**File:** `rule_generics_combined.json`
 
 ```mermaid
 graph TD
@@ -89,8 +89,8 @@ graph TD
     L2_PERSISTENCE_FIM ==> L3_C2_CONNECTION
 ```
 
-## GENERIC_LOLBIN_DOWNLOAD: Phát hiện chung: Lạm dụng công cụ hệ thống (LoLBin) để tải mã độc
-**File:** `rule_generic_lolbin_download.json`
+## GENERIC_DATA_STAGING: Phát hiện chung: Đóng gói dữ liệu chuẩn bị tuồn ra ngoài (Data Staging)
+**File:** `rule_generics_combined.json`
 
 ```mermaid
 graph TD
@@ -99,32 +99,13 @@ graph TD
     classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
     classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
 
-    subgraph Layer_L1_LOLBIN_NETWORK ["Lớp 1"]
-        L1_LOLBIN_NETWORK["<b>Công cụ hệ thống tải file lạ về thư mục Tạm</b><br/><hr/><i>🔍 MẪU: (p:Process)-[net:CONNECTED|QUERIED]->(ip:IPAddress)<br/>⚙️ LỌC: p.exe IN ['curl', 'wget', 'nc', 'ftp', 'scp', 'bash'] AND (p<br/>&nbsp;&nbsp;&nbsp;&nbsp;.command CONTAINS '/tmp/' OR p.command CONTAINS '/dev/shm/')</i>"]:::medium
-    end
-    subgraph Layer_L2_EXECUTE_DOWNLOADED_PAYLOAD ["Lớp 2"]
-        L2_EXECUTE_DOWNLOADED_PAYLOAD["<b>Thực thi file vừa tải về</b><br/><hr/><i>🔍 MẪU: (u:User)-[exec:EXECUTED]->(p_new:Process)<br/>⚙️ LỌC: (p_new.exe CONTAINS '/tmp/' OR p_new.exe CONTAINS '/dev/shm/<br/>&nbsp;&nbsp;&nbsp;&nbsp;') AND datetime(exec.last_seen) >= datetime($time_dl)</i>"]:::high
-    end
-    L1_LOLBIN_NETWORK ==> L2_EXECUTE_DOWNLOADED_PAYLOAD
-```
-
-## GENERIC_ROOTKIT_MODULE: Phát hiện chung: Tải Module Nhân hệ điều hành (Rootkit/Kernel Module)
-**File:** `rule_generic_rootkit_module.json`
-
-```mermaid
-graph TD
-    classDef low fill:#fef08a,stroke:#ca8a04,stroke-width:2px,color:#854d0e;
-    classDef medium fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff;
-    classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
-    classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
-
-    subgraph Layer_L1_KERNEL_MODULE_LOAD ["Lớp 1"]
-        L1_KERNEL_MODULE_LOAD["<b>Nhận diện lệnh insmod/modprobe</b><br/><hr/><i>🔍 MẪU: (u:User)-[exec:EXECUTED]->(p:Process)<br/>⚙️ LỌC: p.exe IN ['insmod', 'modprobe', '/sbin/insmod', '/sbin/modpr<br/>&nbsp;&nbsp;&nbsp;&nbsp;obe']</i>"]:::high
+    subgraph Layer_L1_ARCHIVE_DATA ["Lớp 1"]
+        L1_ARCHIVE_DATA["<b>Nén dữ liệu dung lượng lớn</b><br/><hr/><i>🔍 MẪU: (u:User)-[exec:EXECUTED]->(p:Process)-[w:WRITE]->(f:File)<br/>⚙️ LỌC: p.exe IN ['tar', 'zip', 'rar', '7z', 'gzip'] AND (f.path CON<br/>&nbsp;&nbsp;&nbsp;&nbsp;TAINS '/tmp/' OR f.path CONTAINS '/dev/shm/' OR f.path CONTA<br/>&nbsp;&nbsp;&nbsp;&nbsp;INS '/var/tmp/')</i>"]:::medium
     end
 ```
 
-## GENERIC_SQLI_DUMP: Phát hiện chung: Tấn công SQL Injection (SQLi) -> Đánh cắp cơ sở dữ liệu (Database Dump)
-**File:** `rule_generic_sqli_dump.json`
+## GENERIC_DDOS_HTTP: Phát hiện chung: Tấn công từ chối dịch vụ (DoS/DDoS) qua HTTP
+**File:** `rule_generics_combined.json`
 
 ```mermaid
 graph TD
@@ -133,17 +114,13 @@ graph TD
     classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
     classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
 
-    subgraph Layer_L1_SQLI_DETECT ["Lớp 1"]
-        L1_SQLI_DETECT["<b>Nhận diện rải Payload SQLi</b><br/><hr/><i>🔍 MẪU: (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest)<br/>⚙️ LỌC: http.uri CONTAINS 'UNION' OR http.uri CONTAINS 'SELECT' OR h<br/>&nbsp;&nbsp;&nbsp;&nbsp;ttp.uri CONTAINS '%27' OR http.uri CONTAINS 'DROP'</i>"]:::low
+    subgraph Layer_L1_HTTP_FLOOD ["Lớp 1"]
+        L1_HTTP_FLOOD["<b>Nhận diện Flood Requests</b><br/><hr/><i>🔍 MẪU: (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest)<br/>⚙️ LỌC: req_count > 5000</i>"]:::high
     end
-    subgraph Layer_L2_DB_CONNECTION ["Lớp 2"]
-        L2_DB_CONNECTION["<b>Tiến trình Web truy vấn DB bất thường</b><br/><hr/><i>🔍 MẪU: (p:Process)-[conn:CONNECTED]->(db:IPAddress)<br/>⚙️ LỌC: (p.exe CONTAINS 'apache' OR p.exe CONTAINS 'nginx' OR p.exe <br/>&nbsp;&nbsp;&nbsp;&nbsp;CONTAINS 'php') AND conn.dst_port IN [3306, 5432, 1433, 1521<br/>&nbsp;&nbsp;&nbsp;&nbsp;] AND datetime(conn.last_seen) >= datetime($time_sqli)</i>"]:::high
-    end
-    L1_SQLI_DETECT ==> L2_DB_CONNECTION
 ```
 
-## GENERIC_SSH_PERSISTENCE: Phát hiện chung: Cấy khóa SSH trái phép (SSH Persistence)
-**File:** `rule_generic_ssh_persistence.json`
+## RULE_SANTOS_DNSTEAL: Standalone DNSteal (Santos)
+**File:** `rule_generics_combined.json`
 
 ```mermaid
 graph TD
@@ -152,8 +129,38 @@ graph TD
     classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
     classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
 
-    subgraph Layer_L1_AUTH_KEYS_MOD ["Lớp 1"]
-        L1_AUTH_KEYS_MOD["<b>Thay đổi Authorized Keys</b><br/><hr/><i>🔍 MẪU: (p:Process)-[w:WRITE]->(f:File)<br/>⚙️ LỌC: f.path CONTAINS '.ssh/authorized_keys'</i>"]:::high
+    subgraph Layer_L1_DNSTEAL ["Lớp 1"]
+        L1_DNSTEAL["<b>Rò rỉ dữ liệu qua DNS độc lập</b><br/><hr/><i>🔍 MẪU: (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery)<br/>⚙️ LỌC: size(dns.rrname) > 30</i>"]:::critical
+    end
+```
+
+## RULE_SANTOS_PRIVESC: Standalone Privilege Escalation (Santos)
+**File:** `rule_generics_combined.json`
+
+```mermaid
+graph TD
+    classDef low fill:#fef08a,stroke:#ca8a04,stroke-width:2px,color:#854d0e;
+    classDef medium fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff;
+    classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
+    classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
+
+    subgraph Layer_L1_PRIVESC ["Lớp 1"]
+        L1_PRIVESC["<b>Leo quyền độc lập</b><br/><hr/><i>🔍 MẪU: (u:User)-[r:RAN_AS]->(p:Process)<br/>⚙️ LỌC: r.is_su = true OR r.is_sudo = true OR r.target_user = 'root'</i>"]:::high
+    end
+```
+
+## RULE_SANTOS_CRACKING: Web/FTP Cracking Phase (Santos)
+**File:** `rule_generics_combined.json`
+
+```mermaid
+graph TD
+    classDef low fill:#fef08a,stroke:#ca8a04,stroke-width:2px,color:#854d0e;
+    classDef medium fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff;
+    classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;
+    classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;
+
+    subgraph Layer_L1_GENERIC_CRACK ["Lớp 1"]
+        L1_GENERIC_CRACK["<b>Dò mật khẩu mở rộng</b><br/><hr/><i>🔍 MẪU: (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest)<br/>⚙️ LỌC: http.status_code = 401 OR http.status_code = 403 OR http.sta<br/>&nbsp;&nbsp;&nbsp;&nbsp;tus_code = 404</i>"]:::medium
     end
 ```
 

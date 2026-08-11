@@ -1,17 +1,56 @@
 version: '3.8'
 
 services:
-  neo4j:
+  neo4j_santos:
     image: neo4j:latest
-    container_name: neo4j-app
+    container_name: neo4j-app-santos
     ports:
-      - "7474:7474" # HTTP Browser
-      - "7687:7687" # Bolt
+      - "7474:7474"
+      - "7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/admin1234
       - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=512M
+      - NEO4J_dbms_memory_heap_max__size=1G
+      - NEO4J_dbms_memory_pagecache_size=1G
     volumes:
-      - ./neo4j/data:/data
-      - ./neo4j/logs:/logs
-      - ./neo4j/import:/var/lib/neo4j/import
+      - ./neo4j_santos/data:/data
+      - ./neo4j_santos/logs:/logs
+      - ./neo4j_santos/import:/var/lib/neo4j/import
+    restart: unless-stopped
+
+  neo4j_russell:
+    image: neo4j:latest
+    container_name: neo4j-app-russell
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/admin1234
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=512M
+      - NEO4J_dbms_memory_heap_max__size=1G
+      - NEO4J_dbms_memory_pagecache_size=1G
+    volumes:
+      - ./neo4j_russell/data:/data
+      - ./neo4j_russell/logs:/logs
+      - ./neo4j_russell/import:/var/lib/neo4j/import
+    restart: unless-stopped
+
+  neo4j_fox:
+    image: neo4j:latest
+    container_name: neo4j-app-fox
+    ports:
+      - "7476:7474"
+      - "7689:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/admin1234
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=512M
+      - NEO4J_dbms_memory_heap_max__size=1G
+      - NEO4J_dbms_memory_pagecache_size=1G
+    volumes:
+      - ./neo4j_fox/data:/data
+      - ./neo4j_fox/logs:/logs
+      - ./neo4j_fox/import:/var/lib/neo4j/import
     restart: unless-stopped

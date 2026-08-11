@@ -8,7 +8,7 @@
     "name": "Phát hiện WPCrack",
     "severity": "LOW",
     "emit_alert": true,
-    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.uri CONTAINS 'wp-login.php' OR http.is_suspicious_payload = true WITH ip, max(datetime(req.last_seen)) AS time_wpcrack RETURN ip.ip AS attacker_ip, toString(time_wpcrack) AS time_wpcrack LIMIT 5",
+    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.uri CONTAINS 'wp-login.php' OR http.is_suspicious_payload = true WITH ip, max(datetime(req.last_seen)) AS time_wpcrack RETURN ip.ip AS attacker_ip, toString(time_wpcrack) AS time_wpcrack ",
     "on_match": {
       "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} tấn công rà quét hoặc rải payload Web lúc {time_wpcrack}",
       "next": [
@@ -17,7 +17,7 @@
           "name": "Chuyển tài khoản trái phép bằng su",
           "severity": "MEDIUM",
           "emit_alert": true,
-          "query": "MATCH (u:User)-[su:RAN_AS {is_su: true}]->(p:Process) WHERE u.username IN ['www-data', 'apache', 'nginx', 'tomcat', 'nobody', 'daemon'] AND datetime(su.last_seen) >= datetime($time_wpcrack) AND duration.inSeconds(datetime($time_wpcrack), datetime(su.last_seen)).hours <= 4 RETURN u.username AS original_user, su.target_user AS compromised_user, toString(max(datetime(su.last_seen))) AS time_su",
+          "query": "MATCH (u:User)-[su:RAN_AS]->(p:Process) WHERE (su.is_su = true OR su.is_sudo = true OR su.target_user = 'root') AND datetime(su.last_seen) >= datetime($time_wpcrack) - duration('PT1H') RETURN u.username AS original_user, su.target_user AS compromised_user, toString(max(datetime(su.last_seen))) AS time_su",
           "on_match": {
             "alert_message": "🚨 [MEDIUM] Tài khoản Web {original_user} đã leo quyền thành {compromised_user} lúc {time_su}!",
             "next": [

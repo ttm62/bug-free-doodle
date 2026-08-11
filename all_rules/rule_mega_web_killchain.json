@@ -5,30 +5,30 @@
   "trigger_source": "apache_access",
   "tree": {
     "id": "L1_WEB_RECON",
-    "name": "Nh\u1eadn di\u1ec7n r\u00e0 qu\u00e9t Web (Dirb/Nmap)",
+    "name": "Nhận diện rà quét Web (Dirb/Nmap)",
     "severity": "LOW",
     "emit_alert": true,
     "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code IN [403, 404] OR http.user_agent CONTAINS 'dirb' OR http.user_agent CONTAINS 'nmap' WITH ip, count(req) AS recon_count, max(datetime(req.last_seen)) AS time_recon WHERE recon_count > 20 RETURN ip.ip AS attacker_ip, recon_count, toString(time_recon) AS time_recon ORDER BY time_recon ASC",
     "on_match": {
-      "alert_message": "\u26a0\ufe0f [LOW] Ph\u00e1t hi\u1ec7n IP {attacker_ip} \u0111ang r\u00e0 qu\u00e9t th\u01b0 m\u1ee5c \u1ea9n ({recon_count} l\u1ed7i) l\u00fac {time_recon}",
+      "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} đang rà quét thư mục ẩn ({recon_count} lỗi) lúc {time_recon}",
       "next": [
         {
           "id": "L2_WEBSHELL_UPLOAD",
-          "name": "Ch\u00e8n Webshell th\u00e0nh c\u00f4ng",
+          "name": "Chèn Webshell thành công",
           "severity": "MEDIUM",
           "emit_alert": true,
-          "query": "MATCH (ip:IPAddress {ip: $attacker_ip})-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS '.php' OR http.is_suspicious_payload = true) AND http.status_code = 200 AND datetime(req.last_seen) >= datetime($time_recon) RETURN http.uri AS webshell_uri, toString(max(datetime(req.last_seen))) AS time_webshell ORDER BY time_webshell ASC",
+          "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS '.php' OR http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'shell' OR http.is_suspicious_payload = true OR http.method = 'POST') AND (http.status_code = 200 OR http.status_code = 201 OR http.status_code = 302 OR http.status_code = 404) AND datetime(req.timestamp) >= datetime($time_recon) - duration('PT2H') RETURN ip.ip AS attacker_ip_l2, http.uri AS webshell_uri, toString(max(datetime(req.timestamp))) AS time_webshell ORDER BY time_webshell ASC LIMIT 5",
           "on_match": {
-            "alert_message": "\ud83d\udea8 [MEDIUM] IP {attacker_ip} \u0111\u00e3 t\u1ea3i l\u00ean/k\u00edch ho\u1ea1t Webshell t\u1ea1i {webshell_uri} l\u00fac {time_webshell}",
+            "alert_message": "🚨 [MEDIUM] IP {attacker_ip_l2} đã tải lên/kích hoạt Webshell tại {webshell_uri} lúc {time_webshell}",
             "next": [
               {
                 "id": "L3_REVERSE_SHELL",
-                "name": "K\u00edch ho\u1ea1t Reverse Shell",
+                "name": "Kích hoạt Reverse Shell",
                 "severity": "CRITICAL",
                 "emit_alert": true,
-                "query": "MATCH (p_web:Process)-[s:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache') AND p_shell.exe IN ['/bin/bash', '/bin/sh', 'nc', 'python', 'perl'] AND datetime(s.last_seen) >= datetime($time_webshell) RETURN p_shell.exe AS shell_cmd, p_shell.pid AS shell_pid, toString(max(datetime(s.last_seen))) AS time_revshell",
+                "query": "MATCH (p_web:Process)-[s:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache' OR p_web.exe CONTAINS 'nginx' OR p_web.exe CONTAINS 'php') AND (p_shell.exe CONTAINS 'bash' OR p_shell.exe CONTAINS 'sh' OR p_shell.exe CONTAINS 'nc' OR p_shell.exe CONTAINS 'python' OR p_shell.exe CONTAINS 'perl' OR p_shell.comm CONTAINS 'sh' OR p_shell.comm CONTAINS 'bash') AND datetime(s.timestamp) >= datetime($time_webshell) - duration('PT1H') RETURN p_shell.exe AS shell_cmd, p_shell.pid AS shell_pid, toString(max(datetime(s.timestamp))) AS time_revshell LIMIT 5",
                 "on_match": {
-                  "alert_message": "\ud83d\udca5 [CRITICAL] M\u00c3 \u0110\u1ed8C TH\u1ef0C THI: Webshell t\u1eeb {attacker_ip} \u0111\u00e3 k\u00edch ho\u1ea1t {shell_cmd} (PID {shell_pid}) l\u00fac {time_revshell}!",
+                  "alert_message": "💥 [CRITICAL] MÃ ĐỘC THỰC THI: Webshell từ {attacker_ip_l2} đã kích hoạt {shell_cmd} (PID {shell_pid}) lúc {time_revshell}!",
                   "next": []
                 }
               }

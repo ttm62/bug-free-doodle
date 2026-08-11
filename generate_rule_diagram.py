@@ -83,24 +83,32 @@ def main():
                 data = json.load(f)
             except:
                 continue
-                
-        rule_id = data.get("rule_id", "Unknown")
-        rule_name = data.get("rule_name", "Unknown")
-        
-        readme_content += f"## {rule_id}: {rule_name}\n"
-        readme_content += f"**File:** `{os.path.basename(fpath)}`\n\n"
-        readme_content += "```mermaid\ngraph TD\n"
-        readme_content += "    classDef low fill:#fef08a,stroke:#ca8a04,stroke-width:2px,color:#854d0e;\n"
-        readme_content += "    classDef medium fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff;\n"
-        readme_content += "    classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;\n"
-        readme_content += "    classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;\n\n"
-        
-        tree = data.get("tree", {})
-        if tree:
-            lines = build_mermaid(tree)
-            readme_content += "\n".join(lines) + "\n"
+
+        if isinstance(data, dict):
+            rule_list = [data]
+        elif isinstance(data, list):
+            rule_list = data
+        else:
+            continue
             
-        readme_content += "```\n\n"
+        for rule_item in rule_list:
+            rule_id = rule_item.get("rule_id", "Unknown")
+            rule_name = rule_item.get("rule_name", "Unknown")
+            
+            readme_content += f"## {rule_id}: {rule_name}\n"
+            readme_content += f"**File:** `{os.path.basename(fpath)}`\n\n"
+            readme_content += "```mermaid\ngraph TD\n"
+            readme_content += "    classDef low fill:#fef08a,stroke:#ca8a04,stroke-width:2px,color:#854d0e;\n"
+            readme_content += "    classDef medium fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff;\n"
+            readme_content += "    classDef high fill:#dc2626,stroke:#991b1b,stroke-width:2px,color:#fff;\n"
+            readme_content += "    classDef critical fill:#7f1d1d,stroke:#450a0a,stroke-width:2px,color:#fff;\n\n"
+            
+            tree = rule_item.get("tree", {})
+            if tree:
+                lines = build_mermaid(tree)
+                readme_content += "\n".join(lines) + "\n"
+                
+            readme_content += "```\n\n"
 
     readme_path = os.path.join(folder, 'README.md')
     with open(readme_path, 'w', encoding='utf-8') as f:
