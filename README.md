@@ -247,7 +247,7 @@ RETURN
     time: toString(exfil_time_dns)
   } AS Layer3B_DNSExfil,
 
-  // Đánh giá mối đe dọa (Hiển thị tất cả nhánh bị kích hoạt)
+  // Đánh giá
   CASE 
     WHEN time_sudo IS NOT NULL AND exfil_time_dns IS NOT NULL 
          THEN '💥💥 CRITICAL: Full Multi-Branch Exploit (Root Sudo & DNS Exfiltration)'
