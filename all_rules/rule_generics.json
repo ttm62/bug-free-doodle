@@ -85,23 +85,6 @@
     }
   },
   {
-    "rule_id": "RULE_GENERICS_CRACKING",
-    "rule_name": "Web/FTP Cracking Phase",
-    "enabled": true,
-    "trigger_source": "syslog",
-    "tree": {
-      "id": "L1_GENERIC_CRACK",
-      "name": "Dò mật khẩu mở rộng",
-      "severity": "MEDIUM",
-      "emit_alert": true,
-      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code = 401 OR http.status_code = 403 OR http.status_code = 404 WITH ip, count(req) AS failed_auths, max(datetime(req.last_seen)) AS time_cracking WHERE failed_auths > 20 RETURN ip.ip AS attacker_ip, failed_auths AS fails, toString(time_cracking) AS time_cracking ",
-      "on_match": {
-        "alert_message": "🚨 [MEDIUM] IP {attacker_ip} liên tục gặp lỗi xác thực/truy cập Web ({fails} lần) lúc {time_cracking} (Cracking)",
-        "next": []
-      }
-    }
-  },
-  {
     "rule_id": "RULE_SERVICE_EVASION",
     "rule_name": "Defense Evasion (Service Stop)",
     "enabled": true,

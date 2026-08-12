@@ -249,7 +249,11 @@ func main() {
 		}
 
 		if processedCount%2000 == 0 {
-			fmt.Printf("[*] Processed %d log events into provenance graph... (Elapsed: %v)\n", processedCount, time.Since(startTime))
+			var percentage float64
+			if totalLines > 0 {
+				percentage = float64(processedCount) / float64(totalLines) * 100.0
+			}
+			fmt.Printf("[*] Processed %d log events into provenance graph (%.2f%%)... (Elapsed: %v)\n", processedCount, percentage, time.Since(startTime))
 		}
 
 		advanceReplaySource(src)

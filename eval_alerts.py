@@ -105,6 +105,11 @@ def main():
         
     print(f"--- CHI TIẾT THỜI GIAN PHÁT HIỆN: '{args.alerts_file}' (Kịch bản: '{args.scenario}') ---")
     
+    total_alerts_processed = 0
+    matched_alerts_count = 0
+    false_positives_count = 0
+    skipped_alerts_count = 0
+    
     try:
         with open(args.alerts_file, 'r') as f:
             for line in f:
@@ -128,29 +133,37 @@ def main():
                         matches = get_labels_and_record(ts, node_name)
                         time_human = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                         
+                        total_alerts_processed += 1
                         if matches:
-                            for label, start, end, match_type in matches:
-                                start_human = datetime.fromtimestamp(start, tz=timezone.utc).strftime('%H:%M:%S')
-                                end_human = datetime.fromtimestamp(end, tz=timezone.utc).strftime('%H:%M:%S')
-                                print(f"[HIT - {label.upper()}] [{match_type}] Alert: {node_name}")
-                                print(f"  - Event Time: {time_human} (Epoch: {ts})")
-                                print(f"  - Ground Truth: {start_human} -> {end_human}")
-                                print("-" * 60)
+                            matched_alerts_count += 1
                         else:
-                            print(f"[OUT_OF_WINDOW] Alert: {node_name}")
-                            print(f"  - Event Time: {time_human} (Epoch: {ts})")
-                            print(f"  - Status: Does not match any ground truth phase")
-                            print("-" * 60)
+                            false_positives_count += 1
+                        
+                        # if matches:
+                        #     for label, start, end, match_type in matches:
+                        #         start_human = datetime.fromtimestamp(start, tz=timezone.utc).strftime('%H:%M:%S')
+                        #         end_human = datetime.fromtimestamp(end, tz=timezone.utc).strftime('%H:%M:%S')
+                        #         print(f"[HIT - {label.upper()}] [{match_type}] Alert: {node_name}")
+                        #         print(f"  - Event Time: {time_human} (Epoch: {ts})")
+                        #         print(f"  - Ground Truth: {start_human} -> {end_human}")
+                        #         print("-" * 60)
+                        # else:
+                        #     print(f"[OUT_OF_WINDOW] Alert: {node_name}")
+                        #     print(f"  - Event Time: {time_human} (Epoch: {ts})")
+                        #     print(f"  - Status: Does not match any ground truth phase")
+                        #     print("-" * 60)
+                            # print("-" * 60)
                             
                     except Exception as e:
-                        pass
+                        skipped_alerts_count += 1
                 else:
-                    print(f"[SKIPPED] Alert: {node_name}")
-                    print(f"  - Reason: No valid 2022 timestamp found to map with Ground Truth.")
-                    print("-" * 60)
-                    
+                    skipped_alerts_count += 1
+                    # print(f"[SKIPPED] Alert: {node_name}")
+                    # print(f"  - Reason: No valid 2022 timestamp found to map with Ground Truth.")
+                    # print("-" * 60)
+        
         print("\n" + "="*60)
-        print(f"GROUND TRUTH COVERAGE SUMMARY (Scenario: {args.scenario})")
+        print(f"COVERAGE SUMMARY (Scenario: {args.scenario})")
         print("="*60)
         
         total_phases = len(gt_stats)
@@ -164,11 +177,24 @@ def main():
                 status = "DETECTED" if gt["hit_count"] > 0 else "MISSED  "
                 print(f"[{i+1}/{total_phases}] {status} | Phase: {gt['label'].upper()} ({start_h} -> {end_h})")
                 if gt["hit_count"] > 0:
-                    print(f"       Alerts matched: {gt['hit_count']}")
-                    print(f"       Alert names: {', '.join(gt['alerts'])}")
+                    print(f"       Matched: {gt['hit_count']}")
+                    print(f"       Names: {', '.join(gt['alerts'])}")
             
             print("-" * 60)
-            print(f"TOTAL COVERAGE: {detected_phases}/{total_phases} phases detected ({(detected_phases/total_phases*100):.1f}%)\n")
+            print(f"COVERAGE: {detected_phases}/{total_phases} phases detected ({(detected_phases/total_phases*100):.1f}%)")
+            
+            print("-" * 60)
+            print(f"METRICS:")
+            tp_pct = (matched_alerts_count / total_alerts_processed * 100) if total_alerts_processed > 0 else 0
+            fp_pct = (false_positives_count / total_alerts_processed * 100) if total_alerts_processed > 0 else 0
+            
+            total_all = total_alerts_processed + skipped_alerts_count
+            skip_pct = (skipped_alerts_count / total_all * 100) if total_all > 0 else 0
+
+            print(f"  - Total alerts processed:            {total_alerts_processed}")
+            print(f"  - True Positives (Matched a phase):  {matched_alerts_count} ({tp_pct:.1f}%)")
+            print(f"  - False Positives (Out of window):   {false_positives_count} ({fp_pct:.1f}%)")
+            print(f"  - Skipped (Invalid/no timestamp):    {skipped_alerts_count} ({skip_pct:.1f}%)\n")
     except FileNotFoundError:
         print(f"Error: File {args.alerts_file} not found")
 
