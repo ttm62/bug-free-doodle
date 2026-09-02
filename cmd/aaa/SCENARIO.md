@@ -26,6 +26,13 @@ python3 eval_alerts.py wardbeck_alerts.jsonl ait_ads/labels.csv wardbeck
 python3 plot_stats.py
 python3 plot_stats_boxplot.py
 
+# harrison (Port 7478)
+go run ./cmd/aaa -mode neo4j -folder harrison_no-pcaps -neo4j-user "neo4j" -neo4j-pass "admin1234" -neo4j-url http://localhost:7478
+go run ./cmd/aaa -mode detect -rules ./all_rules -alerts-file harrison_alerts.jsonl -neo4j-url http://localhost:7478 -neo4j-user "neo4j" -neo4j-pass "admin1234"
+python3 eval_alerts.py harrison_alerts.jsonl ait_ads/labels.csv harrison
+python3 plot_stats.py
+python3 plot_stats_boxplot.py
+
 # run webhook mode
 go run ./cmd/aaa \
   -mode webhook \
