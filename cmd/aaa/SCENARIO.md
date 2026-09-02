@@ -58,7 +58,8 @@ go run ./cmd/aaa \
   -rules ./all_rules \
   -alerts-file detection_alerts.jsonl \
   -scan-interval 5 \
-  -alert-cooldown 1800
+  -alert-cooldown 300 \
+  -rate 50
 
 <!-- docker exec single-node-wazuh.manager-1 truncate -s 0 /var/ossec/logs/archives/archives.json -->
 docker restart vector_shipper; docker exec single-node-wazuh.manager-1 truncate -s 0 /var/ossec/logs/archives/archives.json
