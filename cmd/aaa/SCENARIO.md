@@ -58,12 +58,12 @@ rm -f detection_alerts.jsonl
 # Chạy mode stream với cooldown 300s (5 phút)
 go run ./cmd/aaa \
   -mode stream \
-  -folder russellmitchell_no-pcaps \
-  -neo4j-url http://localhost:7475 \
+  -folder fox_no-pcaps \
+  -neo4j-url http://localhost:7476 \
   -neo4j-user neo4j \
   -neo4j-pass admin1234 \
   -rules ./all_rules \
-  -alerts-file detection_alerts.jsonl \
+  -alerts-file fox_alerts.jsonl \
   -scan-interval 5 \
   -alert-cooldown 300 \
   -rate 50

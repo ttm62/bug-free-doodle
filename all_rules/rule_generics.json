@@ -87,7 +87,7 @@
       "entity_keys": ["attacker_ip"],
       "rate_metric": "dns_count",
       "min_velocity": 10.0,
-      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR size(dns.rrname) > 50) WITH ip, count(q) AS dns_count, min(datetime(q.last_seen)) AS time_dnsteal WHERE dns_count > 5 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
+      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR size(dns.rrname) > 50) WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dnsteal WHERE dns_count > 5 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
       "on_match": {
         "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS từ {attacker_ip} ({dns_count} queries) lúc {time_dnsteal}!",
         "next": []
