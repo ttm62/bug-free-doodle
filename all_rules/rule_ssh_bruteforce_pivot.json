@@ -8,6 +8,12 @@
     "name": "Kiểm tra Dò Mật Khẩu SSH Thất Bại",
     "severity": "LOW",
     "emit_alert": true,
+    "entity_keys": [
+      "attacker_ip",
+      "target_user"
+    ],
+    "rate_metric": "failed_count",
+    "min_growth_ratio": 2.0,
     "query": "MATCH (u:User)-[r:AUTHENTICATED_ON {status: 'failed'}]->(ip:IPAddress) WITH u, ip, count(r) AS failed_count, max(datetime(r.timestamp)) AS last_fail_time WHERE failed_count >= 5 RETURN ip.ip AS attacker_ip, u.username AS target_user, failed_count, last_fail_time",
     "on_match": {
       "alert_message": "⚠️ [LOW] IP {attacker_ip} dò mật khẩu thất bại {failed_count} lần với tài khoản {target_user}",
@@ -17,6 +23,10 @@
           "name": "Kiểm tra Đăng Nhập SSH Thành Công Ngay Sau Đó",
           "severity": "MEDIUM",
           "emit_alert": true,
+          "entity_keys": [
+            "target_user",
+            "compromised_host"
+          ],
           "query": "MATCH (u:User {username: $target_user})-[r:AUTHENTICATED_ON {status: 'success'}]->(h:Host) WHERE datetime(r.timestamp) > $last_fail_time AND duration.inSeconds($last_fail_time, datetime(r.timestamp)).seconds < 3600 RETURN h.hostname AS compromised_host, max(datetime(r.timestamp)) AS success_time",
           "on_match": {
             "alert_message": "⚠️ [MEDIUM] IP {attacker_ip} đã chiếm quyền tài khoản {target_user} và đăng nhập thành công vào {compromised_host}!",

@@ -124,6 +124,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 				ToID:      "host_" + hostname,
 				ToLabel:   "Host",
 				Type:      "AUTHENTICATED_ON",
+				Timestamp: ts.UTC().Format(time.RFC3339Nano),
 				Properties: map[string]interface{}{
 					"status":    "success",
 					"timestamp": ts.UTC().Format(time.RFC3339Nano),
@@ -138,6 +139,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 				ToID:      ipID,
 				ToLabel:   "IPAddress",
 				Type:      "CONNECTED",
+				Timestamp: ts.UTC().Format(time.RFC3339Nano),
 				Properties: map[string]interface{}{
 					"dst_port":  port,
 					"timestamp": ts.UTC().Format(time.RFC3339Nano),
@@ -177,6 +179,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 			ToID:      ipID,
 			ToLabel:   "IPAddress",
 			Type:      "AUTHENTICATED_ON",
+			Timestamp: ts.UTC().Format(time.RFC3339Nano),
 			Properties: map[string]interface{}{
 				"status":    "failed",
 				"timestamp": ts.UTC().Format(time.RFC3339Nano),
@@ -218,6 +221,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 					ToID:      procID,
 					ToLabel:   "Process",
 					Type:      "RAN_AS",
+					Timestamp: ts.UTC().Format(time.RFC3339Nano),
 					Properties: map[string]interface{}{
 						"is_sudo":     true,
 						"command":     cmd,
@@ -231,6 +235,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 					ToID:      targetUserID,
 					ToLabel:   "User",
 					Type:      "SPAWNED",
+					Timestamp: ts.UTC().Format(time.RFC3339Nano),
 					Properties: map[string]interface{}{
 						"command":   cmd,
 						"timestamp": ts.UTC().Format(time.RFC3339Nano),
@@ -258,6 +263,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 				ToID:      userID,
 				ToLabel:   "User",
 				Type:      "RAN_AS",
+				Timestamp: ts.UTC().Format(time.RFC3339Nano),
 				Properties: map[string]interface{}{
 					"timestamp": ts.UTC().Format(time.RFC3339Nano),
 				},
@@ -298,6 +304,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 					ToID:      procID,
 					ToLabel:   "Process",
 					Type:      "RAN_AS",
+					Timestamp: ts.UTC().Format(time.RFC3339Nano),
 					Properties: map[string]interface{}{
 						"is_su":       true,
 						"target_user": targetUser,

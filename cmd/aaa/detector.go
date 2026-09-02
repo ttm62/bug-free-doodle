@@ -11,54 +11,217 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-var (
-	alertCache    map[string]time.Time
-	alertCacheMu  sync.RWMutex
-	alertCacheTTL = 24 * time.Hour
-)
-
-func initAlertCache() {
-	alertCacheMu.Lock()
-	defer alertCacheMu.Unlock()
-	alertCache = make(map[string]time.Time)
+type AlertCacheEntry struct {
+	LastSeen  time.Time
+	LastCount float64
 }
 
-func generateAlertHash(ruleID, nodeID string, details map[string]interface{}) string {
-	b, _ := json.Marshal(details)
+var (
+	alertCache        map[string]AlertCacheEntry
+	alertCacheMu      sync.RWMutex
+	alertCacheTTL     = 24 * time.Hour
+	alertCooldownSecs int = 0
+)
+
+func initAlertCache(cooldownSecs int) {
+	alertCacheMu.Lock()
+	defer alertCacheMu.Unlock()
+	alertCache = make(map[string]AlertCacheEntry)
+	alertCooldownSecs = cooldownSecs
+}
+
+func extractEventTime(details map[string]interface{}) (time.Time, bool) {
+	// Ưu tiên các trường thời gian cụ thể của node hiện tại
+	priorityKeys := []string{
+		"time_dns", "time_dnsteal", "time_sudo", "time_su", "time_privesc",
+		"time_rce", "time_revshell", "time_drop", "time_webshell",
+		"time_recon", "time_wpcrack", "time_cracking", "time_post", "time_service_stop", "time_scan",
+	}
+
+	for _, pk := range priorityKeys {
+		if v, ok := details[pk]; ok {
+			if s, ok := v.(string); ok && len(s) >= 19 {
+				clean := s
+				if idx := strings.IndexByte(clean, '.'); idx > 0 {
+					clean = clean[:idx]
+				}
+				if len(clean) >= 19 {
+					if t, err := time.Parse("2006-01-02T15:04:05", clean[:19]); err == nil {
+						return t, true
+					}
+				}
+			}
+		}
+	}
+
+	for _, v := range details {
+		if s, ok := v.(string); ok && len(s) >= 19 {
+			clean := s
+			if idx := strings.IndexByte(clean, '.'); idx > 0 {
+				clean = clean[:idx]
+			}
+			if len(clean) >= 19 {
+				if t, err := time.Parse("2006-01-02T15:04:05", clean[:19]); err == nil {
+					return t, true
+				}
+			}
+		}
+	}
+	return time.Time{}, false
+}
+
+func extractMetricCount(metricKey string, details map[string]interface{}) float64 {
+	if metricKey != "" {
+		if v, ok := details[metricKey]; ok {
+			switch val := v.(type) {
+			case float64:
+				return val
+			case int:
+				return float64(val)
+			case int64:
+				return float64(val)
+			case string:
+				if f, err := strconv.ParseFloat(val, 64); err == nil {
+					return f
+				}
+			}
+		}
+	}
+
+	// Tự động tìm trường số đếm phổ biến
+	countKeys := []string{"dns_count", "req_count", "recon_count", "scan_count", "fails", "count", "queries"}
+	for _, ck := range countKeys {
+		if v, ok := details[ck]; ok {
+			switch val := v.(type) {
+			case float64:
+				return val
+			case int:
+				return float64(val)
+			case int64:
+				return float64(val)
+			case string:
+				if f, err := strconv.ParseFloat(val, 64); err == nil {
+					return f
+				}
+			}
+		}
+	}
+	return 1.0
+}
+
+func generateAlertHash(ruleID, nodeID string, node RuleTree, details map[string]interface{}) string {
+	stableDetails := make(map[string]interface{})
+
+	// 1. Nếu node có khai báo EntityKeys cụ thể, chỉ dùng các keys đó để hash
+	if len(node.EntityKeys) > 0 {
+		for _, ek := range node.EntityKeys {
+			if v, ok := details[ek]; ok {
+				stableDetails[ek] = v
+			}
+		}
+	} else {
+		// 2. Mặc định lọc bỏ các trường thời gian động và số đếm động
+		for k, v := range details {
+			lowerK := strings.ToLower(k)
+			if strings.HasPrefix(lowerK, "time") ||
+				strings.Contains(lowerK, "_time") ||
+				strings.Contains(lowerK, "timestamp") ||
+				strings.Contains(lowerK, "last_seen") ||
+				strings.Contains(lowerK, "first_seen") ||
+				strings.Contains(lowerK, "count") ||
+				strings.Contains(lowerK, "fails") ||
+				strings.Contains(lowerK, "queries") {
+				continue
+			}
+			stableDetails[k] = v
+		}
+	}
+
+	b, _ := json.Marshal(stableDetails)
 	hash := sha256.Sum256(b)
 	return fmt.Sprintf("%s:%s:%x", ruleID, nodeID, hash)
 }
 
-func isDuplicateAlert(hash string) bool {
+func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interface{}) bool {
 	if alertCache == nil {
-		return false // Cache not initialized
+		return false
 	}
+
+	eventTime, hasEventTime := extractEventTime(details)
+	currentTime := time.Now()
+	if hasEventTime {
+		currentTime = eventTime
+	}
+
+	currentCount := extractMetricCount(node.RateMetric, details)
+
 	alertCacheMu.RLock()
-	lastSeen, exists := alertCache[hash]
+	entry, exists := alertCache[hash]
 	alertCacheMu.RUnlock()
 
-	if exists && time.Since(lastSeen) < alertCacheTTL {
-		return true
+	if exists {
+		// 1. Nếu đặt alertCooldownSecs <= 0: Khử trùng vĩnh viễn
+		if alertCooldownSecs <= 0 {
+			return true
+		}
+
+		diffTime := currentTime.Sub(entry.LastSeen)
+		if diffTime < 0 {
+			diffTime = -diffTime
+		}
+
+		// 2. Nếu có cấu hình Tốc độ tăng trưởng MinVelocity (ví dụ > 50 queries/phút)
+		if node.MinVelocity > 0 && diffTime.Seconds() > 0 {
+			deltaCount := currentCount - entry.LastCount
+			if deltaCount < 0 {
+				deltaCount = currentCount // Reset mốc nếu count giảm
+			}
+			velocityPerMin := (deltaCount / diffTime.Seconds()) * 60.0
+			// Nếu vận tốc chưa vượt ngưỡng và chưa vượt max cooldown (6 giờ) -> Chặn trùng
+			if velocityPerMin < node.MinVelocity && diffTime < 6*time.Hour {
+				return true
+			}
+		}
+
+		// 3. Nếu có cấu hình Tỷ lệ tăng trưởng MinGrowthRatio (ví dụ tăng >= 2.0 lần)
+		if node.MinGrowthRatio > 1.0 {
+			if entry.LastCount > 0 && currentCount < (entry.LastCount*node.MinGrowthRatio) && diffTime < 6*time.Hour {
+				return true
+			}
+		}
+
+		// 4. Kiểm tra Cooldown thời gian tĩnh mặc định
+		if diffTime < time.Duration(alertCooldownSecs)*time.Second {
+			return true
+		}
 	}
 
 	alertCacheMu.Lock()
-	alertCache[hash] = time.Now()
+	alertCache[hash] = AlertCacheEntry{
+		LastSeen:  currentTime,
+		LastCount: currentCount,
+	}
 	alertCacheMu.Unlock()
 	return false
 }
 
 type RuleTree struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	Severity  string      `json:"severity"`
-	EmitAlert *bool       `json:"emit_alert,omitempty"`
-	Query     string      `json:"query"`
-	OnMatch   MatchAction `json:"on_match"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	Severity       string      `json:"severity"`
+	EmitAlert      *bool       `json:"emit_alert,omitempty"`
+	Query          string      `json:"query"`
+	EntityKeys     []string    `json:"entity_keys,omitempty"`
+	RateMetric     string      `json:"rate_metric,omitempty"`
+	MinVelocity    float64     `json:"min_velocity,omitempty"`
+	MinGrowthRatio float64     `json:"min_growth_ratio,omitempty"`
+	OnMatch        MatchAction `json:"on_match"`
 }
 
 type MatchAction struct {
@@ -237,12 +400,12 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 	results, err := runCypherQuery(url, user, pass, node.Query, params)
 	elapsedQuery := time.Since(startQuery)
 	indent := strings.Repeat("   ", depth-1)
-	
+
 	if err != nil {
 		fmt.Printf("%s[!] Depth %d [%s] Cypher error: %v\n", indent, depth, node.ID, err)
 		return 0
 	}
-	
+
 	fmt.Printf("%s[🕒 %v] Đã quét lớp: %s\n", indent, elapsedQuery.Round(time.Millisecond), node.Name)
 	if f, err := os.OpenFile("query_stats.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 		f.WriteString(fmt.Sprintf("[%s] RuleID: %s | Depth: %d | Node: %s | Time: %v\n", time.Now().Format(time.RFC3339), rule.RuleID, depth, node.Name, elapsedQuery.Round(time.Millisecond)))
@@ -277,8 +440,8 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 		formattedMsg := formatAlertMessage(node.OnMatch.AlertMessage, fullDetails)
 
 		if shouldEmit {
-			alertHash := generateAlertHash(rule.RuleID, node.ID, fullDetails)
-			if !isDuplicateAlert(alertHash) {
+			alertHash := generateAlertHash(rule.RuleID, node.ID, node, fullDetails)
+			if !isDuplicateAlertNode(alertHash, node, fullDetails) {
 				alertCount++
 				fmt.Printf("%s%s\n", indent, formattedMsg)
 
@@ -311,7 +474,7 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 	return alertCount
 }
 
-func runDetectionMode(rulesPath, alertsFilePath, minSeverityFilter, neo4jURL, neo4jUser, neo4jPass string) {
+func runDetectionMode(rulesPath, alertsFilePath, minSeverityFilter, neo4jURL, neo4jUser, neo4jPass string, shouldLogResult bool) {
 	fmt.Printf("[*] Loading Detection Rules from: %s\n", rulesPath)
 	rules, err := loadRulesFromPath(rulesPath)
 	if err != nil {
@@ -326,9 +489,9 @@ func runDetectionMode(rulesPath, alertsFilePath, minSeverityFilter, neo4jURL, ne
 	var alertFile *os.File
 
 	if alertsFilePath != "" {
-		file, err := os.Create(alertsFilePath)
+		file, err := os.OpenFile(alertsFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Printf("[!] Failed to create alerts JSONL file %s: %v\n", alertsFilePath, err)
+			fmt.Printf("[!] Failed to open alerts JSONL file %s: %v\n", alertsFilePath, err)
 		} else {
 			alertFile = file
 			alertWriter = bufio.NewWriterSize(file, 64*1024)
@@ -341,9 +504,12 @@ func runDetectionMode(rulesPath, alertsFilePath, minSeverityFilter, neo4jURL, ne
 
 	totalAlerts := 0
 	for i, rule := range rules {
-		fmt.Printf("=========================================================================\n")
-		fmt.Printf("[%d/%d] RUNNING RULE: %s (%s)\n", i+1, len(rules), rule.RuleName, rule.RuleID)
-		fmt.Printf("=========================================================================\n")
+		if shouldLogResult {
+			fmt.Printf("=========================================================================\n")
+			fmt.Printf("[%d/%d] RUNNING RULE: %s (%s)\n", i+1, len(rules), rule.RuleName, rule.RuleID)
+			fmt.Printf("=========================================================================\n")
+		}
+
 		alertsFound := evaluateRuleTreeNode(neo4jURL, neo4jUser, neo4jPass, rule, rule.Tree, nil, 1, minSevLevel, alertEncoder, alertWriter)
 		totalAlerts += alertsFound
 		fmt.Println()

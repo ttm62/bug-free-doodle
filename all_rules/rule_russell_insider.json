@@ -8,16 +8,21 @@
     "name": "Phát hiện WPCrack",
     "severity": "LOW",
     "emit_alert": true,
-    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.uri CONTAINS 'wp-login.php' OR http.is_suspicious_payload = true WITH ip, max(datetime(req.last_seen)) AS time_wpcrack RETURN ip.ip AS attacker_ip, toString(time_wpcrack) AS time_wpcrack ",
+    "entity_keys": [
+      "attacker_ip"
+    ],
+    "rate_metric": "wp_count",
+    "min_growth_ratio": 2.0,
+    "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.is_scanner = true OR http.uri CONTAINS 'wp-login.php' OR http.is_suspicious_payload = true WITH ip, count(req) AS wp_count, min(datetime(req.last_seen)) AS time_wpcrack WHERE wp_count >= 10 RETURN ip.ip AS attacker_ip, wp_count, toString(time_wpcrack) AS time_wpcrack ORDER BY time_wpcrack ASC",
     "on_match": {
-      "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} tấn công rà quét hoặc rải payload Web lúc {time_wpcrack}",
+      "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} thực hiện dò quét Wordpress ({wp_count} requests) lúc {time_wpcrack}",
       "next": [
         {
           "id": "L2_SU_ESCALATION",
           "name": "Chuyển tài khoản trái phép bằng su",
           "severity": "MEDIUM",
           "emit_alert": true,
-          "query": "MATCH (u:User)-[su:RAN_AS]->(p:Process) WHERE (su.is_su = true OR su.is_sudo = true OR su.target_user = 'root') AND datetime(su.last_seen) >= datetime($time_wpcrack) - duration('PT1H') RETURN u.username AS original_user, su.target_user AS compromised_user, toString(max(datetime(su.last_seen))) AS time_su",
+          "query": "MATCH (u:User)-[su:RAN_AS]->(p:Process) WHERE (su.is_su = true OR su.is_sudo = true OR su.target_user = 'root') AND datetime(su.last_seen) >= datetime($time_wpcrack) - duration('PT1H') WITH u, su.target_user AS target_user, max(datetime(su.last_seen)) AS time_su RETURN u.username AS original_user, target_user AS compromised_user, toString(time_su) AS time_su",
           "on_match": {
             "alert_message": "🚨 [MEDIUM] Tài khoản Web {original_user} đã leo quyền thành {compromised_user} lúc {time_su}!",
             "next": [
@@ -26,7 +31,7 @@
                 "name": "Lạm dụng Sudo",
                 "severity": "CRITICAL",
                 "emit_alert": true,
-                "query": "MATCH (u:User {username: $compromised_user})-[sudo:RAN_AS {is_sudo: true}]->(p:Process) WHERE datetime(sudo.last_seen) >= datetime($time_su) RETURN sudo.command AS root_command, toString(max(datetime(sudo.last_seen))) AS time_sudo",
+                "query": "MATCH (u:User {username: $compromised_user})-[exec:EXECUTED]->(p:Process) WHERE p.is_sudo = true OR p.exe CONTAINS 'sudo' OR p.command STARTS WITH 'sudo' WITH u, p.command AS root_command, max(datetime(exec.last_seen)) AS time_sudo WHERE datetime(time_sudo) >= datetime($time_su) RETURN root_command, toString(time_sudo) AS time_sudo LIMIT 3",
                 "on_match": {
                   "alert_message": "💥 [CRITICAL] {compromised_user} đã chạy lệnh ROOT: {root_command} lúc {time_sudo}",
                   "next": []
@@ -37,9 +42,15 @@
                 "name": "Tuồn dữ liệu qua DNS",
                 "severity": "HIGH",
                 "emit_alert": true,
-                "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE size(dns.rrname) > 40 AND datetime(q.last_seen) >= datetime($time_su) WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dns WHERE dns_count > 5 RETURN ip.ip AS exfil_ip, dns_count, toString(time_dns) AS time_dns",
+                "entity_keys": [
+                  "exfil_ip",
+                  "compromised_user"
+                ],
+                "rate_metric": "dns_count",
+                "min_velocity": 10.0,
+                "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR size(dns.rrname) > 50) AND datetime(q.last_seen) >= datetime($time_su) WITH ip, count(q) AS dns_count, min(datetime(q.last_seen)) AS time_dns, max(datetime(q.last_seen)) AS last_time WHERE dns_count > 50 RETURN ip.ip AS exfil_ip, dns_count, toString(last_time) AS time_dns",
                 "on_match": {
-                  "alert_message": "💥 [HIGH] Máy chủ {exfil_ip} đang tuồn {dns_count} gói dữ liệu mật qua DNS Tunneling lúc {time_dns}!",
+                  "alert_message": "💥 [HIGH] Máy chủ {exfil_ip} đang gửi {dns_count} gói dữ liệu qua DNS Tunneling lúc {time_dns}!",
                   "next": []
                 }
               }

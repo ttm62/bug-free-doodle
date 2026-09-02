@@ -39,6 +39,7 @@ type ReplayEntry struct {
 	Timestamp     time.Time
 	SourceIndex   int
 	LineNo        int
+	RawLine       string
 	Content       string
 	Nodes         []Node
 	Relationships []Relationship
@@ -50,6 +51,7 @@ type OutputEvent struct {
 	LogType       string         `json:"log_type"`
 	Path          string         `json:"path"`
 	LineNo        int            `json:"line_no"`
+	RawLine       string         `json:"raw_line,omitempty"`
 	Content       string         `json:"content"`
 	Nodes         []Node         `json:"nodes,omitempty"`
 	Relationships []Relationship `json:"relationships,omitempty"`
@@ -132,14 +134,16 @@ func openFileSink(filePath string) (EventSink, error) {
 	}, nil
 }
 
-func openEventSink(mode, filePath, neo4jURL, neo4jUser, neo4jPass string) (EventSink, error) {
+func openEventSink(mode, filePath, neo4jURL, neo4jUser, neo4jPass, wazuhAddr string, rate float64) (EventSink, error) {
 	switch mode {
 	case "file":
 		return openFileSink(filePath)
 	case "neo4j":
-		return newNeo4jSink(neo4jURL, neo4jUser, neo4jPass), nil
+		return newNeo4jSink(neo4jURL, neo4jUser, neo4jPass, rate), nil
+	case "wazuh":
+		return newWazuhSyslogSink(wazuhAddr, rate)
 	default:
-		return nil, fmt.Errorf("unsupported mode '%s', must be 'file' or 'neo4j'", mode)
+		return nil, fmt.Errorf("unsupported mode '%s', must be 'file', 'neo4j', or 'wazuh'", mode)
 	}
 }
 

@@ -8,6 +8,9 @@
     "name": "Nhận diện rà quét Web (Dirb/Nmap)",
     "severity": "LOW",
     "emit_alert": true,
+    "entity_keys": ["attacker_ip"],
+    "rate_metric": "recon_count",
+    "min_growth_ratio": 2.0,
     "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code IN [403, 404] OR http.user_agent CONTAINS 'dirb' OR http.user_agent CONTAINS 'nmap' WITH ip, count(req) AS recon_count, max(datetime(req.last_seen)) AS time_recon WHERE recon_count > 20 RETURN ip.ip AS attacker_ip, recon_count, toString(time_recon) AS time_recon ORDER BY time_recon ASC",
     "on_match": {
       "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} đang rà quét thư mục ẩn ({recon_count} lỗi) lúc {time_recon}",
@@ -17,7 +20,8 @@
           "name": "Chèn Webshell thành công",
           "severity": "MEDIUM",
           "emit_alert": true,
-          "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS '.php' OR http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'shell' OR http.is_suspicious_payload = true OR http.method = 'POST') AND (http.status_code = 200 OR http.status_code = 201 OR http.status_code = 302 OR http.status_code = 404) AND datetime(req.timestamp) >= datetime($time_recon) - duration('PT2H') RETURN ip.ip AS attacker_ip_l2, http.uri AS webshell_uri, toString(max(datetime(req.timestamp))) AS time_webshell ORDER BY time_webshell ASC LIMIT 5",
+          "entity_keys": ["attacker_ip_l2", "webshell_uri"],
+          "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS '.php' OR http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'shell' OR http.is_suspicious_payload = true OR http.method = 'POST') AND (http.status_code = 200 OR http.status_code = 201 OR http.status_code = 302 OR http.status_code = 404) AND datetime(req.timestamp) >= datetime($time_recon) - duration('PT10M') AND datetime(req.timestamp) <= datetime($time_recon) + duration('PT10M') WITH ip, http.uri AS webshell_uri, max(datetime(req.timestamp)) AS time_webshell RETURN ip.ip AS attacker_ip_l2, webshell_uri, toString(time_webshell) AS time_webshell ORDER BY time_webshell ASC LIMIT 5",
           "on_match": {
             "alert_message": "🚨 [MEDIUM] IP {attacker_ip_l2} đã tải lên/kích hoạt Webshell tại {webshell_uri} lúc {time_webshell}",
             "next": [

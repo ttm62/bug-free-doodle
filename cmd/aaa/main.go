@@ -148,6 +148,7 @@ func pushCurrentLine(source *ReplaySource, sourceIndex int, heapObj *EntryHeap) 
 		Timestamp:     parsed.Timestamp,
 		SourceIndex:   sourceIndex,
 		LineNo:        source.LineNo,
+		RawLine:       source.CurrentLine,
 		Content:       parsed.Content,
 		Nodes:         parsed.Nodes,
 		Relationships: parsed.Relationships,
@@ -162,9 +163,9 @@ func main() {
 
 	work_dir := flag.String("wd", dir, "Work dir")
 	datasetFolder := flag.String("folder", "*", "Dataset folder name (default: * for all)")
-	mode := flag.String("mode", "detect", "Execution mode: file | neo4j | detect | webhook")
+	mode := flag.String("mode", "detect", "Execution mode: file | neo4j | detect | webhook | wazuh")
 	outputFile := flag.String("output-file", defaultOutputFile, "Output JSONL filepath when -mode file")
-	alertsFile := flag.String("alerts-file", "detection_alerts.jsonl", "Output JSONL filepath for detection alerts when -mode detect")
+	alertsFile := flag.String("alerts-file", "detection_alerts.jsonl", "Output JSONL filepath for detection alerts when -mode detect or webhook")
 	minSeverity := flag.String("min-severity", "LOW", "Minimum severity level filter: LOW | MEDIUM | HIGH | CRITICAL")
 	neo4jURL := flag.String("neo4j-url", defaultNeo4jURL, "Neo4j HTTP API base URL when -mode neo4j or detect")
 	neo4jUser := flag.String("neo4j-user", defaultNeo4jUser, "Neo4j username")
@@ -172,22 +173,46 @@ func main() {
 	rulesPath := flag.String("rules", "rules", "JSON Decision Tree rules file or directory path when -mode detect or webhook")
 	webhookPort := flag.Int("webhook-port", 5050, "Port for webhook server when -mode webhook")
 	scanInterval := flag.Int("scan-interval", 60, "Interval in seconds to run detection scan when -mode webhook")
+	alertCooldown := flag.Int("alert-cooldown", 300, "Cooldown in seconds between repeated alerts for the same entity (0 = 24h dedup)")
+	wazuhAddr := flag.String("wazuh-addr", "127.0.0.1:514", "Wazuh syslog UDP address (host:port) when -mode wazuh")
+	rate := flag.Float64("rate", 0, "Rate limit in logs/sec when replaying logs (0 = unlimited)")
 
 	skipEvents := flag.Int("skip", 0, "Number of log events to skip before processing")
 
 	flag.Parse()
 
 	if *mode == "detect" {
-		runDetectionMode(*rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass)
+		initAlertCache(*alertCooldown)
+		runDetectionMode(*rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass, true)
 		return
 	}
 
 	if *mode == "webhook" {
+		initAlertCache(*alertCooldown)
 		runWebhookMode(*webhookPort, *scanInterval, *rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass)
 		return
 	}
 
-	sink, err := openEventSink(*mode, *outputFile, *neo4jURL, *neo4jUser, *neo4jPass)
+	// Nếu chạy mode stream (Live Replay + Concurrent Periodic Detection)
+	isStreamMode := (*mode == "stream")
+	sinkMode := *mode
+	if isStreamMode {
+		sinkMode = "neo4j" // Tự động ghi trực tiếp vào Neo4j
+		initAlertCache(*alertCooldown)
+
+		// Khởi động background scanner chạy song song
+		go func() {
+			ticker := time.NewTicker(time.Duration(*scanInterval) * time.Second)
+			defer ticker.Stop()
+			fmt.Printf("[*] [Stream Mode] Background detector started, scanning every %ds (Alert cooldown: %ds)...\n", *scanInterval, *alertCooldown)
+			for range ticker.C {
+				fmt.Printf("\n[*] [%s] [Stream Mode] Triggering periodic detection scan...\n", time.Now().Format(time.RFC3339))
+				runDetectionMode(*rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass, false)
+			}
+		}()
+	}
+
+	sink, err := openEventSink(sinkMode, *outputFile, *neo4jURL, *neo4jUser, *neo4jPass, *wazuhAddr, *rate)
 	if err != nil {
 		fmt.Printf("[!] Failed to initialize sink: %v\n", err)
 		os.Exit(1)
@@ -239,6 +264,7 @@ func main() {
 			LogType:       src.LogType,
 			Path:          src.Path,
 			LineNo:        entry.LineNo,
+			RawLine:       entry.RawLine,
 			Content:       entry.Content,
 			Nodes:         entry.Nodes,
 			Relationships: entry.Relationships,
@@ -253,7 +279,13 @@ func main() {
 			if totalLines > 0 {
 				percentage = float64(processedCount) / float64(totalLines) * 100.0
 			}
-			fmt.Printf("[*] Processed %d log events into provenance graph (%.2f%%)... (Elapsed: %v)\n", processedCount, percentage, time.Since(startTime))
+			if *mode == "wazuh" {
+				fmt.Printf("[*] Replayed %d log events to Wazuh (%s) (%.2f%%)... (Elapsed: %v)\n", processedCount, *wazuhAddr, percentage, time.Since(startTime))
+			} else if isStreamMode {
+				fmt.Printf("[*] [Stream] Processed %d log events into Neo4j graph (%.2f%%)... (Elapsed: %v)\n", processedCount, percentage, time.Since(startTime))
+			} else {
+				fmt.Printf("[*] Processed %d log events into provenance graph (%.2f%%)... (Elapsed: %v)\n", processedCount, percentage, time.Since(startTime))
+			}
 		}
 
 		advanceReplaySource(src)
@@ -269,4 +301,10 @@ func main() {
 	}
 
 	fmt.Printf("[+] Finished processing %d log events in %v. Mode: %s\n", processedCount, time.Since(startTime), *mode)
+
+	// Nếu chạy mode stream, chạy quét một lượt cuối cùng để đảm bảo không sót cảnh báo
+	if isStreamMode {
+		fmt.Printf("\n[*] [Stream Mode] Final detection scan on completed graph...\n")
+		runDetectionMode(*rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass, true)
+	}
 }

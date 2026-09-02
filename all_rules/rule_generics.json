@@ -34,6 +34,26 @@
     }
   },
   {
+    "rule_id": "GENERIC_NETWORK_SCAN",
+    "rule_name": "Phát hiện rà quét mạng (Network Port / Host Scan)",
+    "enabled": true,
+    "trigger_source": "suricata",
+    "tree": {
+      "id": "L1_NETWORK_SCAN",
+      "name": "Nhận diện quét mạng Nmap/TCP Scan",
+      "severity": "MEDIUM",
+      "emit_alert": true,
+      "entity_keys": ["attacker_ip"],
+      "rate_metric": "scan_count",
+      "min_growth_ratio": 2.0,
+      "query": "MATCH (ip:IPAddress)-[r:RAISED]->(a:Alert) WHERE (a.signature CONTAINS 'SCAN' OR a.signature CONTAINS 'Nmap' OR a.category CONTAINS 'Scan') WITH ip, count(a) AS scan_count, max(datetime(r.timestamp)) AS time_scan WHERE scan_count >= 1 RETURN ip.ip AS attacker_ip, scan_count, toString(time_scan) AS time_scan",
+      "on_match": {
+        "alert_message": "🚨 [MEDIUM] Phát hiện hành vi rà quét mạng từ IP {attacker_ip} ({scan_count} dấu hiệu Nmap/Portscan) lúc {time_scan}",
+        "next": []
+      }
+    }
+  },
+  {
     "rule_id": "GENERIC_DDOS_HTTP",
     "rule_name": "Phát hiện chung: Tấn công từ chối dịch vụ (DoS/DDoS) qua HTTP",
     "enabled": true,
@@ -43,7 +63,11 @@
       "name": "Nhận diện Flood Requests",
       "severity": "HIGH",
       "emit_alert": true,
-      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WITH ip, count(req) AS req_count, max(datetime(req.last_seen)) AS last_req WHERE req_count > 5000 RETURN ip.ip AS attacker_ip, req_count, toString(last_req) AS time_ddos ",
+      "entity_keys": ["attacker_ip"],
+      "rate_metric": "req_count",
+      "min_velocity": 100.0,
+      "min_growth_ratio": 2.0,
+      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WITH ip, count(req) AS req_count, max(datetime(req.last_seen)) AS last_req WHERE req_count > 5000 RETURN ip.ip AS attacker_ip, req_count, toString(last_req) AS time_ddos",
       "on_match": {
         "alert_message": "🚨 [HIGH] DoS/DDoS: IP {attacker_ip} đang tấn công máy chủ với {req_count} HTTP Requests. Lần cuối lúc {time_ddos}",
         "next": []
@@ -57,12 +81,15 @@
     "trigger_source": "syslog",
     "tree": {
       "id": "L1_DNSTEAL",
-      "name": "Rò rỉ dữ liệu qua DNS độc lập",
+      "name": "Rò rỉ dữ liệu qua DNS",
       "severity": "CRITICAL",
       "emit_alert": true,
-      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE size(dns.rrname) > 30 RETURN ip.ip AS attacker_ip, toString(max(datetime(q.last_seen))) AS time_dnsteal ",
+      "entity_keys": ["attacker_ip"],
+      "rate_metric": "dns_count",
+      "min_velocity": 10.0,
+      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR size(dns.rrname) > 50) WITH ip, count(q) AS dns_count, min(datetime(q.last_seen)) AS time_dnsteal WHERE dns_count > 5 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
       "on_match": {
-        "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS từ {attacker_ip}!",
+        "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS từ {attacker_ip} ({dns_count} queries) lúc {time_dnsteal}!",
         "next": []
       }
     }
@@ -74,10 +101,10 @@
     "trigger_source": "syslog",
     "tree": {
       "id": "L1_PRIVESC",
-      "name": "Leo quyền độc lập",
+      "name": "Leo thang quyền",
       "severity": "HIGH",
       "emit_alert": true,
-      "query": "MATCH (u:User)-[r:RAN_AS]->(p:Process) WHERE r.is_su = true OR r.is_sudo = true OR r.target_user = 'root' RETURN u.username AS user, toString(datetime(r.last_seen)) AS time_privesc",
+      "query": "MATCH (u:User)-[r:RAN_AS]->(p:Process) WHERE r.is_su = true OR r.is_sudo = true OR r.target_user = 'root' WITH u, max(datetime(r.last_seen)) AS last_privesc RETURN u.username AS user, toString(last_privesc) AS time_privesc",
       "on_match": {
         "alert_message": "🚨 [HIGH] Phát hiện leo quyền từ user {user}!",
         "next": []

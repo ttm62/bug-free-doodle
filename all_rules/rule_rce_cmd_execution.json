@@ -8,16 +8,21 @@
     "name": "Kiểm tra HTTP POST Request Mạng",
     "severity": "LOW",
     "emit_alert": true,
-    "query": "MATCH (ip:IPAddress)-[req_rel:REQUESTED]->(req:HTTPRequest) WHERE req.method = 'POST' RETURN ip.ip AS attacker_ip, toString(max(datetime(req_rel.timestamp))) AS time_post",
+    "entity_keys": [
+      "attacker_ip"
+    ],
+    "rate_metric": "post_count",
+    "min_growth_ratio": 2.0,
+    "query": "MATCH (ip:IPAddress)-[req_rel:REQUESTED]->(req:HTTPRequest) WHERE req.method = 'POST' AND (req.uri CONTAINS '.php' OR req.is_suspicious_payload = true OR req.uri CONTAINS 'upload' OR req.uri CONTAINS 'admin-ajax.php') WITH ip, count(req) AS post_count, max(datetime(req_rel.timestamp)) AS time_post WHERE post_count >= 5 RETURN ip.ip AS attacker_ip, post_count, toString(time_post) AS time_post",
     "on_match": {
-      "alert_message": "⚠️ [LOW] HTTP POST request từ IP {attacker_ip} lúc {time_post}",
+      "alert_message": "⚠️ [LOW] Phát hiện IP {attacker_ip} gửi liên tục {post_count} HTTP POST nghi vấn lúc {time_post}",
       "next": [
         {
           "id": "L2_CMD_EXECUTION",
           "name": "Kiểm tra Tiến Trình Thực Thi Lệnh Shell",
           "severity": "HIGH",
           "emit_alert": true,
-          "query": "MATCH (ip:IPAddress {ip: $attacker_ip})-[req_rel:REQUESTED]->(req:HTTPRequest) MATCH (p_web:Process)-[spawn_rel:SPAWNED]->(p_sh:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache') AND (p_sh.exe IN ['/bin/sh', '/bin/bash', 'python', 'perl', 'nc'] OR p_sh.comm IN ['sh', 'bash', 'python', 'perl', 'nc']) AND datetime(spawn_rel.timestamp) >= datetime(req_rel.timestamp) - duration('PT1H') RETURN p_sh.exe AS sh_exe, p_sh.pid AS sh_pid, toString(max(datetime(spawn_rel.timestamp))) AS time_rce",
+          "query": "MATCH (ip:IPAddress {ip: $attacker_ip})-[req_rel:REQUESTED]->(req:HTTPRequest) MATCH (p_web:Process)-[spawn_rel:SPAWNED]->(p_sh:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache' OR p_web.exe CONTAINS 'php') AND (p_sh.exe IN ['/bin/sh', '/bin/bash', 'python', 'perl', 'nc'] OR p_sh.comm IN ['sh', 'bash', 'python', 'perl', 'nc']) AND datetime(spawn_rel.timestamp) >= datetime(req_rel.timestamp) - duration('PT2H') AND datetime(spawn_rel.timestamp) <= datetime(req_rel.timestamp) + duration('PT12H') RETURN p_sh.exe AS sh_exe, p_sh.pid AS sh_pid, toString(max(datetime(spawn_rel.timestamp))) AS time_rce",
           "on_match": {
             "alert_message": "💥 [HIGH] RCE: IP {attacker_ip} thực thi lệnh từ xa qua tiến trình {sh_exe} (PID {sh_pid}) lúc {time_rce}!",
             "next": [
