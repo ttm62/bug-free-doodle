@@ -4,22 +4,17 @@ from collections import defaultdict
 import seaborn as sns
 import statistics
 
-# File path
 LOG_FILE = "query_stats.log"
 OUTPUT_IMAGE = "query_stats_chart.png"
 
-# Regex to parse the log lines
-# Vd: [2026-08-03T17:44:09+07:00] RuleID: GENERIC_CRYPTOMINER | Depth: 1 | Node: Nhận diện tiến trình đào coin | Time: 326ms
 pattern = re.compile(r'\[.*?\] RuleID: (.*?) \| Depth: (\d+) \| Node: (.*?) \| Time: (.*)')
 
 def parse_time(time_str):
-    """Converts Go duration string to milliseconds (float)"""
     time_str = time_str.strip()
     ms = 0.0
-    import re as regex
-    matches = regex.findall(r'([\d\.]+)(ms|s|µs|us|m|h)', time_str)
+    matches = re.findall(r'([\d\.]+)(ms|s|µs|us|m|h)', time_str)
     
-    if not matches and time_str.replace('.', '', 1).isdigit(): # Fallback
+    if not matches and time_str.replace('.', '', 1).isdigit():
         return float(time_str)
         
     for val, unit in matches:
@@ -32,7 +27,6 @@ def parse_time(time_str):
     return ms
 
 def main():
-    # Store all execution times for each Rule-Node combination
     node_times = defaultdict(list)
     
     try:
@@ -46,7 +40,6 @@ def main():
                     time_str = match.group(4).strip()
                     ms = parse_time(time_str)
                     
-                    # Create a descriptive label combining Rule, Depth, and Node
                     label = f"{rule_id}\n(Lớp {depth}: {node_name})"
                     node_times[label].append(ms)
     except FileNotFoundError:
@@ -57,35 +50,28 @@ def main():
         print("No valid data found in the log file.")
         return
 
-    # Calculate AVERAGE time for each node
     avg_times = []
     for label, times in node_times.items():
         avg = statistics.mean(times)
         avg_times.append((label, avg))
 
-    # Sort data by average execution time (descending)
     sorted_nodes = sorted(avg_times, key=lambda x: x[1], reverse=True)
-    
-    # Extract top 15 heaviest queries to fit the chart nicely
     top_nodes = sorted_nodes[:15]
     
     labels = [x[0] for x in top_nodes]
     times = [x[1] for x in top_nodes]
 
-    # Plotting using Seaborn
     sns.set_theme(style="whitegrid", palette="pastel")
-    plt.figure(figsize=(14, 12)) # Taller for multiline labels
+    plt.figure(figsize=(14, 12))
     
     ax = sns.barplot(x=times, y=labels, hue=labels, dodge=False, legend=False, palette="viridis")
     
-    # Formatting the chart
     plt.title('Neo4j Average Execution Time per Layer', fontsize=16, fontweight='bold', pad=20)
     plt.xlabel('Average Execution Time (ms)', fontsize=14, fontweight='bold')
     plt.ylabel('Rule ID & Detection Node', fontsize=14, fontweight='bold')
     plt.xticks(fontsize=12)
     plt.yticks(fontsize=11)
 
-    # Add value labels to bars
     for i, p in enumerate(ax.patches):
         width = p.get_width()
         plt.text(width + max(times)*0.01, p.get_y() + p.get_height()/2. + 0.1, 

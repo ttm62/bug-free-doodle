@@ -12,7 +12,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Load ground truth
     ground_truth = []
     try:
         with open(args.labels_file, 'r') as f:
@@ -64,11 +63,7 @@ def main():
         for gt in gt_stats:
             lbl = gt["label"].upper()
             
-            # Check Time Match (Strict)
             time_match = (gt["start"] <= ts <= gt["end"])
-            
-            # Check Semantic Match with Time Drift
-            # Chỉ chấp nhận Semantic nếu sai số thời gian không quá 1 giờ
             time_drift_allowed = (gt["start"] - 3600 <= ts <= gt["end"] + 3600)
             
             semantic_match = False
@@ -120,7 +115,6 @@ def main():
                     continue
                     
                 node_name = alert.get('node_name', 'Unknown')
-                
                 time_str = extract_real_time(alert)
                 
                 if time_str:
@@ -131,36 +125,15 @@ def main():
                         ts = dt.timestamp()
                         
                         matches = get_labels_and_record(ts, node_name)
-                        time_human = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-                        
                         total_alerts_processed += 1
                         if matches:
                             matched_alerts_count += 1
                         else:
                             false_positives_count += 1
-                        
-                        # if matches:
-                        #     for label, start, end, match_type in matches:
-                        #         start_human = datetime.fromtimestamp(start, tz=timezone.utc).strftime('%H:%M:%S')
-                        #         end_human = datetime.fromtimestamp(end, tz=timezone.utc).strftime('%H:%M:%S')
-                        #         print(f"[HIT - {label.upper()}] [{match_type}] Alert: {node_name}")
-                        #         print(f"  - Event Time: {time_human} (Epoch: {ts})")
-                        #         print(f"  - Ground Truth: {start_human} -> {end_human}")
-                        #         print("-" * 60)
-                        # else:
-                        #     print(f"[OUT_OF_WINDOW] Alert: {node_name}")
-                        #     print(f"  - Event Time: {time_human} (Epoch: {ts})")
-                        #     print(f"  - Status: Does not match any ground truth phase")
-                        #     print("-" * 60)
-                            # print("-" * 60)
-                            
-                    except Exception as e:
+                    except Exception:
                         skipped_alerts_count += 1
                 else:
                     skipped_alerts_count += 1
-                    # print(f"[SKIPPED] Alert: {node_name}")
-                    # print(f"  - Reason: No valid 2022 timestamp found to map with Ground Truth.")
-                    # print("-" * 60)
         
         print("\n" + "="*60)
         print(f"COVERAGE SUMMARY (Scenario: {args.scenario})")

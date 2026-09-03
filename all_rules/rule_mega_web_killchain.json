@@ -21,7 +21,7 @@
           "severity": "MEDIUM",
           "emit_alert": true,
           "entity_keys": ["attacker_ip_l2", "webshell_uri"],
-          "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS '.php' OR http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'shell' OR http.is_suspicious_payload = true OR http.method = 'POST') AND (http.status_code = 200 OR http.status_code = 201 OR http.status_code = 302 OR http.status_code = 404) AND datetime(req.timestamp) >= datetime($time_recon) - duration('PT10M') AND datetime(req.timestamp) <= datetime($time_recon) + duration('PT10M') WITH ip, http.uri AS webshell_uri, max(datetime(req.timestamp)) AS time_webshell RETURN ip.ip AS attacker_ip_l2, webshell_uri, toString(time_webshell) AS time_webshell ORDER BY time_webshell ASC LIMIT 5",
+          "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.is_suspicious_payload = true OR (http.method = 'POST' AND http.uri CONTAINS 'upload') OR (http.uri CONTAINS '.php' AND http.status_code = 200 AND (http.uri CONTAINS 'shell' OR http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'eval' OR http.uri CONTAINS 'payload'))) AND datetime(req.timestamp) >= datetime($time_recon) - duration('PT5M') AND datetime(req.timestamp) <= datetime($time_recon) + duration('PT30M') WITH ip, http.uri AS webshell_uri, max(datetime(req.timestamp)) AS time_webshell RETURN ip.ip AS attacker_ip_l2, webshell_uri, toString(time_webshell) AS time_webshell ORDER BY time_webshell ASC LIMIT 5",
           "on_match": {
             "alert_message": "🚨 [MEDIUM] IP {attacker_ip_l2} đã tải lên/kích hoạt Webshell tại {webshell_uri} lúc {time_webshell}",
             "next": [
@@ -31,7 +31,7 @@
                 "severity": "CRITICAL",
                 "emit_alert": true,
                 "entity_keys": ["attacker_ip_l2", "shell_cmd"],
-                "query": "MATCH (ip:IPAddress {ip: $attacker_ip_l2})-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'uploads' AND http.uri CONTAINS '.php' AND http.status_code = 200) OR (http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'shell') WITH ip, http.uri AS shell_cmd, max(datetime(req.timestamp)) AS time_revshell RETURN ip.ip AS attacker_ip_l2, shell_cmd, toString(time_revshell) AS time_revshell LIMIT 1",
+                "query": "MATCH (ip:IPAddress {ip: $attacker_ip_l2})-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'uploads' AND http.uri CONTAINS '.php' AND http.status_code = 200) OR (http.uri CONTAINS 'cmd=' OR http.uri CONTAINS 'shell=' OR http.uri CONTAINS 'exec=') WITH ip, http.uri AS shell_cmd, max(datetime(req.timestamp)) AS time_revshell RETURN ip.ip AS attacker_ip_l2, shell_cmd, toString(time_revshell) AS time_revshell LIMIT 1",
                 "on_match": {
                   "alert_message": "💥 [CRITICAL] Webshell từ {attacker_ip_l2} đã kích hoạt mã độc / reverse shell tại {shell_cmd} lúc {time_revshell}!",
                   "next": []

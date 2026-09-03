@@ -1,10 +1,8 @@
 import json
 
-# Fix mega rule
 with open('rules/rule_mega_web_killchain.json', 'r') as f:
     mega = json.load(f)
 
-# Remove limits and add order by
 mega['tree']['query'] = "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code IN [403, 404] OR http.user_agent CONTAINS 'dirb' OR http.user_agent CONTAINS 'nmap' WITH ip, count(req) AS recon_count, max(datetime(req.last_seen)) AS time_recon WHERE recon_count > 20 RETURN ip.ip AS attacker_ip, recon_count, toString(time_recon) AS time_recon ORDER BY time_recon ASC LIMIT 10"
 
 mega['tree']['on_match']['next'][0]['query'] = "MATCH (ip:IPAddress {ip: $attacker_ip})-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS '.php' OR http.is_suspicious_payload = true) AND http.status_code = 200 AND datetime(req.last_seen) >= datetime($time_recon) RETURN http.uri AS webshell_uri, toString(max(datetime(req.last_seen))) AS time_webshell ORDER BY time_webshell ASC LIMIT 10"
@@ -14,7 +12,6 @@ mega['tree']['on_match']['next'][0]['on_match']['next'][0]['query'] = "MATCH (p_
 with open('rules/rule_mega_web_killchain.json', 'w') as f:
     json.dump(mega, f, indent=2)
 
-# Create Network Recon rule
 recon = {
   "rule_id": "RULE_NETWORK_RECON",
   "rule_name": "Network Scans -> Dirb",
@@ -47,7 +44,6 @@ recon = {
 with open('rules/rule_network_recon.json', 'w') as f:
     json.dump(recon, f, indent=2)
 
-# Create Cracking rule
 cracking = {
   "rule_id": "RULE_CRACKING",
   "rule_name": "Password Cracking Phase",
@@ -68,7 +64,6 @@ cracking = {
 with open('rules/rule_cracking.json', 'w') as f:
     json.dump(cracking, f, indent=2)
 
-# Create Service Stop rule
 service_stop = {
   "rule_id": "RULE_SERVICE_EVASION",
   "rule_name": "Defense Evasion (Service Stop)",

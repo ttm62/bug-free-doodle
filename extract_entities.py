@@ -5,27 +5,21 @@ import argparse
 from pathlib import Path
 
 def extract_entities_from_line(log_line):
-    # Trích xuất IP (Dùng word boundary để tránh cắt nhầm chuỗi DNS)
     ips = re.findall(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', log_line)
     
-    # Lọc bỏ các IP đảo ngược của DNS (VD: 1.0.143.10.in-addr.arpa)
     if '.in-addr.arpa' in log_line:
-        ips = [] # Thường log DNS reverse không chứa IP attacker trực tiếp ở dạng đảo
+        ips = []
     
-    # Trích xuất User (Tìm trong auditd hoặc auth.log)
     users = []
     
-    # Auditd format: uid=..., auid=..., acct="username"
     acct_match = re.search(r'acct="([^"]+)"', log_line)
     if acct_match:
         users.append(acct_match.group(1))
         
-    # OpenVPN format: username/IP:Port
     vpn_match = re.search(r'([a-zA-Z0-9_\-\.]+)@?\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b:[0-9]+', log_line)
-    if vpn_match and not vpn_match.group(1).isdigit(): # Tránh bắt nhầm dải IP
+    if vpn_match and not vpn_match.group(1).isdigit():
         users.append(vpn_match.group(1))
         
-    # Auth.log format: su: ... to root on /dev/pts/..., or Accepted password for username
     su_match = re.search(r'\bsu\b.*to ([a-zA-Z0-9_\-]+)', log_line)
     if su_match and not su_match.group(1).isdigit():
         users.append(su_match.group(1))
@@ -34,10 +28,8 @@ def extract_entities_from_line(log_line):
     if ssh_match and not ssh_match.group(1).isdigit():
         users.append(ssh_match.group(1))
 
-    # Trích xuất File/Artifact độc hại (Webshell, Data Exfil)
     files = re.findall(r'[a-zA-Z0-9_\-\.]+\.(?:php|xlsx|tar\.gz|zip|sh|bash)\b', log_line)
     
-    # Trích xuất Command (sudo, bash, python, wget, curl)
     commands = []
     cmd_match = re.search(r'COMMAND=(/.+)', log_line)
     if cmd_match:
@@ -86,18 +78,15 @@ def main():
         if not label_file.is_file():
             continue
 
-        # Tìm đường dẫn file log trong thư mục gather/
         rel_path = label_file.relative_to(labels_dir)
         raw_log_file = gather_dir / rel_path
 
         if not raw_log_file.exists():
             continue
 
-        # Load file log vào bộ nhớ (truy xuất dòng nhanh)
         with open(raw_log_file, 'r', encoding='utf-8', errors='ignore') as f:
             raw_lines = f.readlines()
 
-        # Đọc các nhãn (labels)
         with open(label_file, 'r', encoding='utf-8') as f:
             for json_line in f:
                 if not json_line.strip():
@@ -121,7 +110,7 @@ def main():
     print("CÁC THỰC THỂ GROUND TRUTH:")
     print("========================================")
     
-    print("\nIPs (Bao gồm Attacker & Target):")
+    print("\nIPs:")
     for ip in sorted(extracted_entities["Attacker_IPs"]):
         print(f"  - {ip}")
 
@@ -130,7 +119,7 @@ def main():
         if user not in ["root"]: 
             print(f"  - {user}")
         if user == "root":
-            print(f"  - root (Leo quyền thành công)")
+            print(f"  - root")
             
     print("\nFiles / Artifacts:")
     for f in sorted(extracted_entities["Malicious_Files"]):

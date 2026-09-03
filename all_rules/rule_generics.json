@@ -12,7 +12,9 @@
       "entity_keys": [
         "attacker_ip"
       ],
-      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'rockyou' OR http.uri CONTAINS 'wordlist' OR http.uri CONTAINS 'htpasswd' OR http.uri CONTAINS 'shadow') AND NOT http.uri CONTAINS 'change_password' WITH ip, http.uri AS wordlist_uri, max(datetime(req.timestamp)) AS time_cracking RETURN ip.ip AS attacker_ip, 'rockyou' AS target_user, 1 AS fails, wordlist_uri, toString(time_cracking) AS time_cracking",
+      "rate_metric": "fails",
+      "min_growth_ratio": 2.0,
+      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'rockyou' OR http.uri CONTAINS 'wordlist' OR http.uri ENDS WITH '/shadow' OR http.uri ENDS WITH '/.htpasswd' OR http.uri ENDS WITH '/htpasswd') AND NOT http.uri CONTAINS 'change_password' WITH ip, count(req) AS fails, max(datetime(req.last_seen)) AS time_cracking WHERE fails >= 1 RETURN ip.ip AS attacker_ip, 'rockyou' AS target_user, fails, 'wordlist_hash' AS wordlist_uri, toString(time_cracking) AS time_cracking",
       "on_match": {
         "alert_message": "🚨 [MEDIUM] Phát hiện IP {attacker_ip} tải mật khẩu băm ({wordlist_uri}) lúc {time_cracking}",
         "next": []
@@ -72,9 +74,9 @@
         "attacker_ip"
       ],
       "rate_metric": "req_count",
-      "min_velocity": 100.0,
-      "min_growth_ratio": 2.0,
-      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WITH ip, count(req) AS req_count, max(datetime(req.last_seen)) AS last_req WHERE req_count > 5000 RETURN ip.ip AS attacker_ip, req_count, toString(last_req) AS time_ddos",
+      "min_velocity": 500.0,
+      "min_growth_ratio": 3.0,
+      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE http.status_code = 200 WITH ip, count(req) AS req_count, max(datetime(req.last_seen)) AS last_req WHERE req_count > 10000 RETURN ip.ip AS attacker_ip, req_count, toString(last_req) AS time_ddos",
       "on_match": {
         "alert_message": "🚨 [HIGH] DoS/DDoS: IP {attacker_ip} đang tấn công máy chủ với {req_count} HTTP Requests. Lần cuối lúc {time_ddos}",
         "next": []
@@ -95,8 +97,8 @@
         "attacker_ip"
       ],
       "rate_metric": "dns_count",
-      "min_growth_ratio": 5.0,
-      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR (size(dns.rrname) > 60 AND NOT dns.rrname CONTAINS 'in-addr.arpa')) WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dnsteal WHERE dns_count >= 100 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
+      "min_growth_ratio": 2.0,
+      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE dns.is_exfiltration = true OR (size(dns.rrname) > 80 AND NOT dns.rrname CONTAINS 'in-addr.arpa' AND NOT dns.rrname CONTAINS 'local') WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dnsteal WHERE dns_count >= 1000 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
       "on_match": {
         "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS từ {attacker_ip} ({dns_count} queries) lúc {time_dnsteal}!",
         "next": []

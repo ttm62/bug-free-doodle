@@ -8,7 +8,6 @@ import textwrap
 def extract_query_logic(query):
     if not query:
         return ""
-    # Format Cypher query nicely for markdown block
     formatted = query.replace(" WHERE ", "\nWHERE ").replace(" RETURN ", "\nRETURN ").replace(" AND ", "\n  AND ")
     return formatted
 
@@ -19,7 +18,7 @@ def extract_queries_markdown(node, level=1):
     if query:
         md_lines.append(f"**Lớp {level}: {node_name}**")
         md_lines.append("```cypher")
-        md_lines.append(format_cypher(query))
+        md_lines.append(extract_query_logic(query))
         md_lines.append("```")
         md_lines.append("")
         
@@ -45,7 +44,6 @@ def build_mermaid(node, parent_id=None, level=1):
     
     node_label = f"<b>{node_name}</b>"
     
-    # Wrap subgraph label in quotes to avoid mermaid parsing errors
     mermaid_lines.append(f'    subgraph Layer_{node_id} ["Lớp {level}"]')
     mermaid_lines.append(f'        {node_id}["{node_label}"]:::{sev_class}')
     mermaid_lines.append(f'    end')
@@ -61,7 +59,7 @@ def build_mermaid(node, parent_id=None, level=1):
 
 def main():
     parser = argparse.ArgumentParser(description="Tạo sơ đồ Mermaid tự động cho các tập luật JSON")
-    parser.add_argument("--folder", "-f", required=True, help="Tên thư mục chứa các file rule JSON (ví dụ: rules hoặc generic_rules)")
+    parser.add_argument("--folder", "-f", required=True, help="Tên thư mục chứa các file rule JSON")
     args = parser.parse_args()
     
     folder = args.folder

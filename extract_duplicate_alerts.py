@@ -46,7 +46,6 @@ def extract_wazuh_duplicates(wazuh_file, cooldown=5.0):
             data_obj = alert.get("data", {}) or {}
             src_ip = data_obj.get("srcip") or data_obj.get("src_ip") or "no_ip"
             
-            # Lấy nội dung log cụ thể: full_log hoặc trích xuất từ data (Suricata/Apache/Syslog)
             full_log = alert.get("full_log")
             if not full_log:
                 if "http" in data_obj and isinstance(data_obj["http"], dict):
@@ -59,7 +58,6 @@ def extract_wazuh_duplicates(wazuh_file, cooldown=5.0):
                 else:
                     full_log = rule_desc
 
-            # Deduplication key đồng bộ chuẩn xác với compare_ids_benchmarks.py
             dedup_key = rule_id
 
             if dedup_key in last_seen:
@@ -78,7 +76,6 @@ def extract_wazuh_duplicates(wazuh_file, cooldown=5.0):
                     })
                     continue
 
-            # Kept as original/anchor
             last_seen[dedup_key] = (ts, {
                 "timestamp": dt.isoformat(),
                 "rule_id": rule_id,
@@ -139,7 +136,6 @@ def extract_aminer_duplicates(aminer_file, cooldown=5.0):
                     })
                     continue
 
-            # Kept
             last_seen[dedup_key] = (ts, {
                 "timestamp": dt.isoformat(),
                 "comp_name": comp_name
@@ -158,7 +154,6 @@ def print_summary(name, total, kept, dups, sample_limit=5):
     print(f"• Alert đại diện (Giữ lại): {kept:,} ({(kept/total*100):.1f}%)" if total > 0 else "")
     print(f"• Alert TRÙNG LẶP (Bỏ qua): {dup_count:,} ({dup_percent:.2f}%)")
 
-    # Group duplicate types
     counter = defaultdict(int)
     for d in dups:
         counter[f"{d['key']} - {d['rule_description'][:40]}"] += 1

@@ -46,13 +46,59 @@ func newNeo4jSink(url, user, pass string, rate float64) EventSink {
 		interval = time.Duration(float64(time.Second) / rate)
 	}
 
-	return &neo4jSink{
+	sink := &neo4jSink{
 		url:       url,
 		user:      user,
 		pass:      pass,
-		client:    &http.Client{Timeout: 30 * time.Second},
-		batchSize: 100,
+		client:    &http.Client{Timeout: 60 * time.Second},
+		batchSize: 1000,
 		rateLimit: interval,
+	}
+
+	sink.ensureSchemaIndexes()
+	return sink
+}
+
+func (s *neo4jSink) ensureSchemaIndexes() {
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS FOR (n:IPAddress) ON (n.id)",
+		"CREATE INDEX IF NOT EXISTS FOR (n:Process) ON (n.id)",
+		"CREATE INDEX IF NOT EXISTS FOR (n:File) ON (n.id)",
+		"CREATE INDEX IF NOT EXISTS FOR (n:HTTPRequest) ON (n.id)",
+		"CREATE INDEX IF NOT EXISTS FOR (n:User) ON (n.id)",
+		"CREATE INDEX IF NOT EXISTS FOR (n:DNSQuery) ON (n.id)",
+		"CREATE INDEX IF NOT EXISTS FOR (n:Alert) ON (n.id)",
+	}
+
+	var stmts []neo4jStatement
+	for _, idx := range indexes {
+		stmts = append(stmts, neo4jStatement{
+			Statement:  idx,
+			Parameters: map[string]interface{}{},
+		})
+	}
+
+	reqBody := neo4jTxRequest{Statements: stmts}
+	jsonBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return
+	}
+
+	endpoint := s.url + "/db/neo4j/tx/commit"
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.user != "" && s.pass != "" {
+		auth := base64.StdEncoding.EncodeToString([]byte(s.user + ":" + s.pass))
+		req.Header.Set("Authorization", "Basic "+auth)
+	}
+
+	resp, err := s.client.Do(req)
+	if err == nil {
+		resp.Body.Close()
+		fmt.Printf("[+] [Neo4j] Verified/Created schema indexes for high-speed replay.\n")
 	}
 }
 
