@@ -22,7 +22,10 @@
           "name": "Chuyển tài khoản trái phép bằng su",
           "severity": "MEDIUM",
           "emit_alert": true,
-          "query": "MATCH (u:User)-[su:RAN_AS]->(p:Process) WHERE (su.is_su = true OR su.is_sudo = true OR su.target_user = 'root') AND datetime(su.last_seen) >= datetime($time_wpcrack) - duration('PT1H') WITH u, su.target_user AS target_user, max(datetime(su.last_seen)) AS time_su RETURN u.username AS original_user, target_user AS compromised_user, toString(time_su) AS time_su",
+          "entity_keys": [
+            "compromised_user"
+          ],
+          "query": "MATCH (u:User)-[su:RAN_AS]->(p:Process) WHERE (su.is_su = true OR su.is_sudo = true OR su.target_user = 'root') AND datetime(su.last_seen) >= datetime($time_wpcrack) - duration('PT1H') AND datetime(su.last_seen) <= datetime($time_wpcrack) + duration('PT12H') WITH u, su.target_user AS target_user, max(datetime(su.last_seen)) AS time_su RETURN u.username AS original_user, target_user AS compromised_user, toString(time_su) AS time_su",
           "on_match": {
             "alert_message": "🚨 [MEDIUM] Tài khoản Web {original_user} đã leo quyền thành {compromised_user} lúc {time_su}!",
             "next": [
@@ -31,7 +34,10 @@
                 "name": "Lạm dụng Sudo",
                 "severity": "CRITICAL",
                 "emit_alert": true,
-                "query": "MATCH (u:User {username: $compromised_user})-[exec:EXECUTED]->(p:Process) WHERE p.is_sudo = true OR p.exe CONTAINS 'sudo' OR p.command STARTS WITH 'sudo' WITH u, p.command AS root_command, max(datetime(exec.last_seen)) AS time_sudo WHERE datetime(time_sudo) >= datetime($time_su) RETURN root_command, toString(time_sudo) AS time_sudo LIMIT 3",
+                "entity_keys": [
+                  "compromised_user"
+                ],
+                "query": "MATCH (u:User {username: $compromised_user})-[exec:EXECUTED]->(p:Process) WHERE p.is_sudo = true OR p.exe CONTAINS 'sudo' OR p.command STARTS WITH 'sudo' WITH u, p.command AS root_command, max(datetime(exec.last_seen)) AS time_sudo WHERE datetime(time_sudo) >= datetime($time_su) AND datetime(time_sudo) <= datetime($time_su) + duration('PT12H') RETURN root_command, toString(time_sudo) AS time_sudo LIMIT 3",
                 "on_match": {
                   "alert_message": "💥 [CRITICAL] {compromised_user} đã chạy lệnh ROOT: {root_command} lúc {time_sudo}",
                   "next": []
@@ -48,7 +54,7 @@
                 ],
                 "rate_metric": "dns_count",
                 "min_velocity": 10.0,
-                "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR size(dns.rrname) > 50) AND datetime(q.last_seen) >= datetime($time_su) WITH ip, count(q) AS dns_count, min(datetime(q.last_seen)) AS time_dns, max(datetime(q.last_seen)) AS last_time WHERE dns_count > 50 RETURN ip.ip AS exfil_ip, dns_count, toString(last_time) AS time_dns",
+                "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR (size(dns.rrname) > 60 AND NOT dns.rrname CONTAINS 'in-addr.arpa')) AND datetime(q.last_seen) >= datetime($time_su) AND datetime(q.last_seen) <= datetime($time_su) + duration('PT12H') WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dns WHERE dns_count >= 100 RETURN ip.ip AS exfil_ip, dns_count, toString(time_dns) AS time_dns",
                 "on_match": {
                   "alert_message": "💥 [HIGH] Máy chủ {exfil_ip} đang gửi {dns_count} gói dữ liệu qua DNS Tunneling lúc {time_dns}!",
                   "next": []

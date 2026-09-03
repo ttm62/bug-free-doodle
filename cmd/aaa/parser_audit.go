@@ -150,6 +150,13 @@ func parseAuditLogLine(input string) (ParsedLogLine, error) {
 		}
 	}
 
+	auditType := ""
+	if strings.HasPrefix(input, "type=") {
+		if spaceIdx := strings.IndexByte(input, ' '); spaceIdx > 5 {
+			auditType = input[5:spaceIdx]
+		}
+	}
+
 	kv := parseKeyValueString(content)
 
 	var nodes []Node
@@ -163,8 +170,9 @@ func parseAuditLogLine(input string) (ParsedLogLine, error) {
 	auid := kv["auid"]
 	name := kv["name"]
 	syscall := kv["syscall"]
+	unit := kv["unit"]
 
-	if isBenignSystemProc(exe, comm) {
+	if isBenignSystemProc(exe, comm) && auditType != "SERVICE_STOP" && auditType != "SERVICE_START" {
 		// Drop this log line to reduce graph bloat
 		return ParsedLogLine{}, nil
 	}
@@ -173,16 +181,27 @@ func parseAuditLogLine(input string) (ParsedLogLine, error) {
 	if pid != "" {
 		procID = "proc_" + pid
 
+		procProps := map[string]interface{}{
+			"pid":     pid,
+			"ppid":    ppid,
+			"exe":     exe,
+			"comm":    comm,
+			"syscall": syscall,
+		}
+		if auditType != "" {
+			procProps["audit_type"] = auditType
+		}
+		if unit != "" {
+			procProps["unit"] = unit
+		}
+		if auditType == "SERVICE_STOP" || auditType == "SERVICE_START" {
+			procProps["is_service_event"] = true
+		}
+
 		nodes = append(nodes, Node{
-			ID:    procID,
-			Label: "Process",
-			Properties: map[string]interface{}{
-				"pid":     pid,
-				"ppid":    ppid,
-				"exe":     exe,
-				"comm":    comm,
-				"syscall": syscall,
-			},
+			ID:         procID,
+			Label:      "Process",
+			Properties: procProps,
 		})
 
 		if ppid != "" && ppid != "0" {

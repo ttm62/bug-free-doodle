@@ -15,3 +15,5 @@ cmd/replay/replay.jsonl
 neo4j/neo4j*/
 ait_ads/*.json
 *.zip
+*.txt
+*.pyc

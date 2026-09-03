@@ -18,7 +18,111 @@ KEYWORD_MAP = {
     "DNSTEAL": ["dns", "tunnel", "exfiltration", "dnsteal", "rò rỉ dữ liệu", "tuồn dữ liệu"]
 }
 
-def load_ground_truth(labels_file, scenario):
+def extract_entity(data, fallback_text=""):
+    """Trả về entity ổn định để dedup không gộp alert của các thực thể khác nhau."""
+    if isinstance(data, dict):
+        for key in ("attacker_ip", "exfil_ip", "srcip", "src_ip", "source_ip", "ip", "user", "username", "compromised_user", "agent_id", "id"):
+            value = data.get(key)
+            if value not in (None, ""):
+                return str(value)
+
+    match = re.search(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", fallback_text)
+    return match.group(0) if match else "unknown"
+
+def is_duplicate(last_seen, dedup_key, ts, dedup_window):
+    """Khử trùng lặp theo event-time; alert out-of-order không bị loại nhầm."""
+    if dedup_window <= 0:
+        return False
+
+    previous = last_seen.get(dedup_key)
+    if previous is not None:
+        delta = ts - previous
+        if 0 <= delta < dedup_window:
+            return True
+
+    # Không thay mốc mới hơn bằng event đến muộn có timestamp cũ hơn.
+    if previous is None or ts > previous:
+        last_seen[dedup_key] = ts
+    return False
+
+def extract_custom_attack_time(details, alert_message):
+    """Lấy thời điểm sự kiện tấn công, không dùng timestamp lúc engine ghi alert."""
+    priority_time_keys = [
+        "time_dns", "time_dnsteal", "time_sudo", "time_su", "time_privesc",
+        "time_rce", "time_revshell", "time_drop", "time_webshell",
+        "time_recon", "time_wpcrack", "time_cracking", "time_post", "time_service_stop",
+    ]
+
+    def parse_time(value):
+        if not isinstance(value, str) or "T" not in value:
+            return None
+        try:
+            return datetime.strptime(value[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+        except ValueError:
+            return None
+
+    for key in priority_time_keys:
+        attack_time = parse_time(details.get(key))
+        if attack_time is not None:
+            return attack_time
+
+    for value in details.values():
+        attack_time = parse_time(value)
+        if attack_time is not None:
+            return attack_time
+
+    match = re.search(r'(202\d-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})', alert_message)
+    return parse_time(match.group(1)) if match else None
+
+def load_ground_truth_from_attacktimes(attacktimes_file, scenario):
+    """Đọc Ground Truth trực tiếp từ file attacktimes.py chuẩn của dataset tác giả."""
+    gt = []
+    if not os.path.exists(attacktimes_file):
+        return None
+    try:
+        with open(attacktimes_file, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        pattern = rf"[\'\"]{scenario}[\'\"]\s*:\s*\{{([^}}]+)\}}"
+        sc_match = re.search(pattern, content)
+        if not sc_match:
+            return None
+
+        body = sc_match.group(1)
+        phase_pattern = r"[\'\"]([a-zA-Z0-9_-]+)[\'\"]\s*:\s*\[datetime\.strptime\([\'\"]([^\'\"]+)[\'\"],[^,]+,\s*datetime\.strptime\([\'\"]([^\'\"]+)[\'\"]"
+        
+        for p_match in re.finditer(phase_pattern, body):
+            label = p_match.group(1)
+            # Bỏ qua các khoảng thời gian đo false positive để chỉ giữ lại các pha tấn công thực tế
+            if label.startswith("false_positive"):
+                continue
+            start_str = p_match.group(2)
+            end_str = p_match.group(3)
+            try:
+                start_ts = datetime.strptime(start_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+                end_ts = datetime.strptime(end_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+                gt.append({
+                    "label": label,
+                    "start": start_ts,
+                    "end": end_ts,
+                    "hit_count": 0,
+                    "alerts": []
+                })
+            except ValueError:
+                pass
+    except Exception as e:
+        print(f"⚠️ Lỗi khi parse {attacktimes_file}: {e}")
+        return None
+    return gt if gt else None
+
+def load_ground_truth(labels_file, scenario, attacktimes_file="alert-data-set-main/attacktimes.py"):
+    # 1. Ưu tiên load từ attacktimes.py (Ground Truth chuẩn gốc của tác giả)
+    if attacktimes_file and os.path.exists(attacktimes_file):
+        gt = load_ground_truth_from_attacktimes(attacktimes_file, scenario)
+        if gt:
+            return gt
+
+    # 2. Fallback sang labels.csv
     gt = []
     try:
         with open(labels_file, 'r') as f:
@@ -27,6 +131,8 @@ def load_ground_truth(labels_file, scenario):
                 if len(row) >= 4 and row[0] == scenario:
                     try:
                         label = row[1]
+                        if label.startswith("false_positive"):
+                            continue
                         start = float(row[2])
                         end = float(row[3])
                         gt.append({
@@ -101,18 +207,19 @@ def eval_aminer(aminer_file, gt_template, dedup_window=0):
             comp = alert.get("AnalysisComponent", {})
             comp_name = comp.get("AnalysisComponentName", "")
             
-            # Deduplication cooldown
-            if dedup_window > 0:
-                if comp_name in last_seen and (ts - last_seen[comp_name] < dedup_window):
-                    continue
-                last_seen[comp_name] = ts
-
-            total_alerts += 1
-
             # Extract message
             msg = comp_name + " " + comp.get("Message", "")
             raw = " ".join(log_data.get("RawLogData", []))
             combined_text = msg + " " + raw
+
+            # Cùng detector nhưng khác sensor/IP vẫn là alert độc lập.
+            sensor = alert.get("AMiner", {}).get("ID", "unknown")
+            entity = f"{sensor}|{extract_entity({}, raw)}"
+            dedup_key = (comp_name, entity)
+            if is_duplicate(last_seen, dedup_key, ts, dedup_window):
+                continue
+
+            total_alerts += 1
 
             matched = match_phase(ts, combined_text, gt_stats)
             if matched:
@@ -164,20 +271,20 @@ def eval_wazuh(wazuh_file, gt_template, dedup_window=0):
                 fp_count += 1
                 continue
 
-            rule_id = rule.get("id", "")
-            # Deduplication cooldown per rule_id
-            if dedup_window > 0:
-                if rule_id in last_seen and (ts - last_seen[rule_id] < dedup_window):
-                    continue
-                last_seen[rule_id] = ts
-
-            total_alerts += 1
-
             desc = rule.get("description", "")
             full_log = alert.get("full_log", "")
             data_obj = alert.get("data", {})
             data_str = json.dumps(data_obj) if data_obj else ""
             combined_text = f"{desc} {full_log} {data_str}"
+
+            rule_id = rule.get("id", "")
+            # Cùng rule nhưng khác IP/user/agent không phải alert trùng.
+            entity = extract_entity(data_obj, combined_text)
+            dedup_key = (rule_id, entity)
+            if is_duplicate(last_seen, dedup_key, ts, dedup_window):
+                continue
+
+            total_alerts += 1
 
             matched = match_phase(ts, combined_text, gt_stats)
             if matched:
@@ -188,12 +295,54 @@ def eval_wazuh(wazuh_file, gt_template, dedup_window=0):
     name = f"Wazuh (Dedup {dedup_window}s)" if dedup_window > 0 else "Wazuh IDS"
     return calc_metrics(name, total_alerts, tp_count, fp_count, gt_stats)
 
-def eval_custom(custom_file, gt_template):
+def eval_labeled_siem(alerts_csv_file, siem_name, gt_template, dedup_window=0):
+    """Đánh giá SIEM từ alert dataset đã được gán nhãn TP/FP theo time_label."""
+    import copy
+    gt_stats = copy.deepcopy(gt_template)
+    phase_stats = {gt["label"].lower(): gt for gt in gt_stats}
+    total_alerts = 0
+    tp_count = 0
+    fp_count = 0
+    last_seen = {}
+
+    with open(alerts_csv_file, "r", newline="") as f:
+        for row in csv.DictReader(f):
+            # `name` bắt đầu bằng AMiner:, Wazuh:, hoặc Suricata:.
+            if not row.get("name", "").startswith(f"{siem_name}:"):
+                continue
+
+            try:
+                ts = float(row["time"])
+            except (KeyError, TypeError, ValueError):
+                # Không có event time thì không thể dedup; vẫn tính là FP.
+                total_alerts += 1
+                fp_count += 1
+                continue
+
+            # short là ID detector chuẩn của dataset; IP/host phân biệt alert độc lập.
+            dedup_key = (row.get("short") or row.get("name", ""), row.get("ip", ""), row.get("host", ""))
+            if is_duplicate(last_seen, dedup_key, ts, dedup_window):
+                continue
+
+            total_alerts += 1
+            phase = row.get("time_label", "").strip().lower()
+            if phase in phase_stats:
+                tp_count += 1
+                phase_stats[phase]["hit_count"] += 1
+            else:
+                # false_positive (và nhãn ngoài ground truth) đều được tính FP.
+                fp_count += 1
+
+    suffix = f", Dedup {dedup_window}s" if dedup_window > 0 else ""
+    return calc_metrics(f"{siem_name} (Label CSV{suffix})", total_alerts, tp_count, fp_count, gt_stats)
+
+def eval_custom(custom_file, gt_template, dedup_window=0):
     import copy
     gt_stats = copy.deepcopy(gt_template)
     total_alerts = 0
     tp_count = 0
     fp_count = 0
+    last_seen = {}
 
     if not os.path.exists(custom_file):
         return None
@@ -207,63 +356,36 @@ def eval_custom(custom_file, gt_template):
             except:
                 continue
 
-            total_alerts += 1
             node_name = alert.get("node_name", "")
             alert_msg = alert.get("alert_message", "")
             details = alert.get("details", {})
             
-            # Extract time: Ưu tiên mốc thời gian của node hiện tại (time_dns, time_su, time_rce, time_privesc...)
-            # Tránh việc lấy nhầm time_wpcrack của tầng L1 khi đang ở tầng L3
-            ts = None
-            priority_time_keys = [
-                "time_dns", "time_dnsteal", "time_sudo", "time_su", "time_privesc", 
-                "time_rce", "time_revshell", "time_drop", "time_webshell", 
-                "time_recon", "time_wpcrack", "time_cracking", "time_post", "time_service_stop"
-            ]
-            
-            for pk in priority_time_keys:
-                if pk in details and isinstance(details[pk], str) and '202' in details[pk]:
-                    try:
-                        clean_time = details[pk][:19]
-                        dt = datetime.strptime(clean_time, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                        ts = dt.timestamp()
-                        break
-                    except:
-                        pass
+            # `timestamp` ở root là thời điểm engine ghi alert; dedup phải dùng attack time.
+            ts = extract_custom_attack_time(details, alert_msg)
 
             if not ts:
-                for k, v in details.items():
-                    if isinstance(v, str) and '202' in v and 'T' in v:
-                        try:
-                            clean_time = v[:19]
-                            dt = datetime.strptime(clean_time, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                            ts = dt.timestamp()
-                            break
-                        except:
-                            pass
-
-            if not ts:
-                match = re.search(r'(202\d-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})', alert_msg)
-                if match:
-                    try:
-                        dt = datetime.strptime(match.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-                        ts = dt.timestamp()
-                    except:
-                        pass
-
-            if not ts:
+                total_alerts += 1
                 fp_count += 1
                 continue
 
             rule_name = alert.get("rule_name", "")
             combined_text = f"{rule_name} {node_name} {alert_msg}"
+            rule_id = alert.get("rule_id", "")
+            node_id = alert.get("node_id", "")
+            entity = extract_entity(details, combined_text)
+            dedup_key = (rule_id, node_id, entity)
+            if is_duplicate(last_seen, dedup_key, ts, dedup_window):
+                continue
+
+            total_alerts += 1
             matched = match_phase(ts, combined_text, gt_stats)
             if matched:
                 tp_count += 1
             else:
                 fp_count += 1
 
-    return calc_metrics("Custom Engine (Graph + Tree)", total_alerts, tp_count, fp_count, gt_stats)
+    name = f"Custom Engine (Graph + Tree, Dedup {dedup_window}s)" if dedup_window > 0 else "Custom Engine (Graph + Tree)"
+    return calc_metrics(name, total_alerts, tp_count, fp_count, gt_stats)
 
 def calc_metrics(name, total_alerts, tp_count, fp_count, gt_stats):
     total_phases = len(gt_stats)
@@ -332,33 +454,39 @@ def main():
     parser = argparse.ArgumentParser(description="So sánh hiệu năng IDS: AMiner vs Wazuh vs Custom Engine")
     parser.add_argument("--scenario", default="russellmitchell", help="Tên kịch bản (russellmitchell, fox, santos, wardbeck)")
     parser.add_argument("--labels", default="ait_ads/labels.csv", help="File labels.csv")
+    parser.add_argument("--attacktimes", default="alert-data-set-main/attacktimes.py", help="File attacktimes.py gốc của dataset")
     parser.add_argument("--aminer", default=None, help="File aminer json")
     parser.add_argument("--wazuh", default=None, help="File wazuh json")
+    parser.add_argument("--siem-labels-dir", default="alert-data-set-main/alerts_csv/alerts_csv", help="Thư mục alert dataset đã gán nhãn TP/FP cho SIEM")
     parser.add_argument("--custom", default="detection_alerts.jsonl", help="File alerts của Custom Engine")
-    parser.add_argument("--dedup-window", type=float, default=0.0, help="Cửa sổ thời gian khử trùng lặp (giây) cho AMiner và Wazuh (VD: 5.0)")
+    parser.add_argument("--dedup-window", type=float, default=0.0, help="Cửa sổ thời gian khử trùng lặp (giây) áp dụng đồng nhất cho AMiner, Wazuh và Custom (VD: 5.0)")
     
     args = parser.parse_args()
 
     aminer_path = args.aminer or f"ait_ads/{args.scenario}_aminer.json"
     wazuh_path = args.wazuh or f"ait_ads/{args.scenario}_wazuh.json"
     custom_path = args.custom
+    siem_labels_path = os.path.join(args.siem_labels_dir, f"{args.scenario}_alerts.txt")
 
-    gt_template = load_ground_truth(args.labels, args.scenario)
+    gt_template = load_ground_truth(args.labels, args.scenario, attacktimes_file=args.attacktimes)
     if not gt_template:
         return
 
     results = []
     
-    # 1. Evaluate AMiner
-    r_aminer = eval_aminer(aminer_path, gt_template, dedup_window=args.dedup_window)
-    if r_aminer: results.append(r_aminer)
-
-    # 2. Evaluate Wazuh
-    r_wazuh = eval_wazuh(wazuh_path, gt_template, dedup_window=args.dedup_window)
-    if r_wazuh: results.append(r_wazuh)
+    # 1-2. SIEM: ưu tiên TP/FP đã được dataset gán nhãn; fallback về JSON thô khi thiếu file.
+    if os.path.exists(siem_labels_path):
+        results.append(eval_labeled_siem(siem_labels_path, "AMiner", gt_template, args.dedup_window))
+        results.append(eval_labeled_siem(siem_labels_path, "Wazuh", gt_template, args.dedup_window))
+    else:
+        print(f"⚠️ Không tìm thấy SIEM label file: {siem_labels_path}; dùng đánh giá heuristic từ JSON.")
+        r_aminer = eval_aminer(aminer_path, gt_template, dedup_window=args.dedup_window)
+        if r_aminer: results.append(r_aminer)
+        r_wazuh = eval_wazuh(wazuh_path, gt_template, dedup_window=args.dedup_window)
+        if r_wazuh: results.append(r_wazuh)
 
     # 3. Evaluate Custom
-    r_custom = eval_custom(custom_path, gt_template)
+    r_custom = eval_custom(custom_path, gt_template, dedup_window=args.dedup_window)
     if r_custom: results.append(r_custom)
 
     if results:

@@ -30,9 +30,10 @@
                 "name": "Kích hoạt Reverse Shell",
                 "severity": "CRITICAL",
                 "emit_alert": true,
-                "query": "MATCH (p_web:Process)-[s:SPAWNED]->(p_shell:Process) WHERE (p_web.exe CONTAINS 'apache' OR p_web.comm CONTAINS 'apache' OR p_web.exe CONTAINS 'nginx' OR p_web.exe CONTAINS 'php') AND (p_shell.exe CONTAINS 'bash' OR p_shell.exe CONTAINS 'sh' OR p_shell.exe CONTAINS 'nc' OR p_shell.exe CONTAINS 'python' OR p_shell.exe CONTAINS 'perl' OR p_shell.comm CONTAINS 'sh' OR p_shell.comm CONTAINS 'bash') AND datetime(s.timestamp) >= datetime($time_webshell) - duration('PT1H') RETURN p_shell.exe AS shell_cmd, p_shell.pid AS shell_pid, toString(max(datetime(s.timestamp))) AS time_revshell LIMIT 5",
+                "entity_keys": ["attacker_ip_l2", "shell_cmd"],
+                "query": "MATCH (ip:IPAddress {ip: $attacker_ip_l2})-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'uploads' AND http.uri CONTAINS '.php' AND http.status_code = 200) OR (http.uri CONTAINS 'cmd' OR http.uri CONTAINS 'shell') WITH ip, http.uri AS shell_cmd, max(datetime(req.timestamp)) AS time_revshell RETURN ip.ip AS attacker_ip_l2, shell_cmd, toString(time_revshell) AS time_revshell LIMIT 1",
                 "on_match": {
-                  "alert_message": "💥 [CRITICAL] Webshell từ {attacker_ip_l2} đã kích hoạt {shell_cmd} (PID {shell_pid}) lúc {time_revshell}!",
+                  "alert_message": "💥 [CRITICAL] Webshell từ {attacker_ip_l2} đã kích hoạt mã độc / reverse shell tại {shell_cmd} lúc {time_revshell}!",
                   "next": []
                 }
               }

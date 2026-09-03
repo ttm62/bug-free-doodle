@@ -7,17 +7,7 @@ python3 plot_stats.py
 python3 plot_stats_boxplot.py
 
 rm -f santos_alerts.jsonl
-go run ./cmd/aaa \
-  -mode stream \
-  -folder santos_no-pcaps \
-  -neo4j-url http://localhost:7474 \
-  -neo4j-user neo4j \
-  -neo4j-pass admin1234 \
-  -rules ./all_rules \
-  -alerts-file santos_alerts.jsonl \
-  -scan-interval 5 \
-  -alert-cooldown 300 \
-  -rate 50
+go run ./cmd/aaa -mode stream -folder santos_no-pcaps -neo4j-url http://localhost:7474 -neo4j-user neo4j -neo4j-pass admin1234 -rules ./all_rules -alerts-file santos_alerts.jsonl -scan-interval 5 -alert-cooldown 300 -rate 50
 
 # russell (Port 7475)
 go run ./cmd/aaa -mode neo4j -folder russellmitchell_no-pcaps -neo4j-user "neo4j" -neo4j-pass "admin1234" -neo4j-url http://localhost:7475
@@ -28,16 +18,7 @@ python3 plot_stats.py
 python3 plot_stats_boxplot.py
 
 rm -f russellmitchell_alerts.jsonl
-go run ./cmd/aaa \
-  -mode stream \
-  -folder russellmitchell_no-pcaps \
-  -neo4j-url http://localhost:7475 \
-  -neo4j-user neo4j \
-  -neo4j-pass admin1234 \
-  -rules ./all_rules \
-  -alerts-file russellmitchell_alerts.jsonl \
-  -scan-interval 5 \
-  -alert-cooldown 300
+go run ./cmd/aaa -mode stream -folder russellmitchell_no-pcaps -neo4j-url http://localhost:7475 -neo4j-user neo4j -neo4j-pass admin1234 -rules ./all_rules -alerts-file russellmitchell_alerts.jsonl -scan-interval 5 -alert-cooldown 300
 
 # fox (Port 7476)
 go run ./cmd/aaa -mode neo4j -folder fox_no-pcaps -neo4j-user "neo4j" -neo4j-pass "admin1234" -neo4j-url http://localhost:7476
@@ -48,17 +29,7 @@ python3 plot_stats.py
 python3 plot_stats_boxplot.py
 
 rm -f fox_alerts.jsonl
-go run ./cmd/aaa \
-  -mode stream \
-  -folder fox_no-pcaps \
-  -neo4j-url http://localhost:7476 \
-  -neo4j-user neo4j \
-  -neo4j-pass admin1234 \
-  -rules ./all_rules \
-  -alerts-file fox_alerts.jsonl \
-  -scan-interval 5 \
-  -alert-cooldown 300 \
-  -rate 50
+go run ./cmd/aaa -mode stream -folder fox_no-pcaps -neo4j-url http://localhost:7476 -neo4j-user neo4j -neo4j-pass admin1234 -rules ./all_rules -alerts-file fox_alerts.jsonl -scan-interval 5 -alert-cooldown 300 -rate 50
 
 # wardbeck (Port 7477)
 go run ./cmd/aaa -mode neo4j -folder wardbeck_no-pcaps -neo4j-user "neo4j" -neo4j-pass "admin1234" -neo4j-url http://localhost:7477
@@ -69,17 +40,7 @@ python3 plot_stats.py
 python3 plot_stats_boxplot.py
 
 rm -f wardbeck_alerts.jsonl
-go run ./cmd/aaa \
-  -mode stream \
-  -folder wardbeck_no-pcaps \
-  -neo4j-url http://localhost:7477 \
-  -neo4j-user neo4j \
-  -neo4j-pass admin1234 \
-  -rules ./all_rules \
-  -alerts-file wardbeck_alerts.jsonl \
-  -scan-interval 5 \
-  -alert-cooldown 300 \
-  -rate 50
+go run ./cmd/aaa -mode stream -folder wardbeck_no-pcaps -neo4j-url http://localhost:7477 -neo4j-user neo4j -neo4j-pass admin1234 -rules ./all_rules -alerts-file wardbeck_alerts.jsonl -scan-interval 5 -alert-cooldown 300 -rate 50
 
 # harrison (Port 7478)
 go run ./cmd/aaa -mode neo4j -folder harrison_no-pcaps -neo4j-user "neo4j" -neo4j-pass "admin1234" -neo4j-url http://localhost:7478
@@ -90,17 +51,7 @@ python3 plot_stats.py
 python3 plot_stats_boxplot.py
 
 rm -f harrison_alerts.jsonl
-go run ./cmd/aaa \
-  -mode stream \
-  -folder harrison_no-pcaps \
-  -neo4j-url http://localhost:7478 \
-  -neo4j-user neo4j \
-  -neo4j-pass admin1234 \
-  -rules ./all_rules \
-  -alerts-file harrison_alerts.jsonl \
-  -scan-interval 5 \
-  -alert-cooldown 300 \
-  -rate 50
+go run ./cmd/aaa -mode stream -folder harrison_no-pcaps -neo4j-url http://localhost:7478 -neo4j-user neo4j -neo4j-pass admin1234 -rules ./all_rules -alerts-file harrison_alerts.jsonl -scan-interval 5 -alert-cooldown 300 -rate 50
 
 # run webhook mode
 go run ./cmd/aaa \

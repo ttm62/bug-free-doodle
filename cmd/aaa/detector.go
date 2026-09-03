@@ -25,7 +25,7 @@ type AlertCacheEntry struct {
 var (
 	alertCache        map[string]AlertCacheEntry
 	alertCacheMu      sync.RWMutex
-	alertCacheTTL     = 24 * time.Hour
+	alertCacheTTL         = 24 * time.Hour
 	alertCooldownSecs int = 0
 )
 
@@ -176,14 +176,18 @@ func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interfa
 			diffTime = -diffTime
 		}
 
+		// 1. Kiểm tra Cooldown thời gian tĩnh mặc định
+		if diffTime < time.Duration(alertCooldownSecs)*time.Second {
+			return true
+		}
+
 		// 2. Nếu có cấu hình Tốc độ tăng trưởng MinVelocity (ví dụ > 50 queries/phút)
 		if node.MinVelocity > 0 && diffTime.Seconds() > 0 {
 			deltaCount := currentCount - entry.LastCount
 			if deltaCount < 0 {
-				deltaCount = currentCount // Reset mốc nếu count giảm
+				deltaCount = currentCount
 			}
 			velocityPerMin := (deltaCount / diffTime.Seconds()) * 60.0
-			// Nếu vận tốc chưa vượt ngưỡng và chưa vượt max cooldown (6 giờ) -> Chặn trùng
 			if velocityPerMin < node.MinVelocity && diffTime < 6*time.Hour {
 				return true
 			}
@@ -194,11 +198,6 @@ func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interfa
 			if entry.LastCount > 0 && currentCount < (entry.LastCount*node.MinGrowthRatio) && diffTime < 6*time.Hour {
 				return true
 			}
-		}
-
-		// 4. Kiểm tra Cooldown thời gian tĩnh mặc định
-		if diffTime < time.Duration(alertCooldownSecs)*time.Second {
-			return true
 		}
 	}
 
@@ -496,7 +495,7 @@ func runDetectionMode(rulesPath, alertsFilePath, minSeverityFilter, neo4jURL, ne
 			alertFile = file
 			alertWriter = bufio.NewWriterSize(file, 64*1024)
 			alertEncoder = json.NewEncoder(alertWriter)
-			fmt.Printf("[+] Alerts will be saved to JSONL file: %s\n", alertsFilePath)
+			fmt.Printf("[+] Alerts will be saved (overwriting previous run) to JSONL file: %s\n", alertsFilePath)
 		}
 	}
 
