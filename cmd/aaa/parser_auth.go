@@ -15,6 +15,13 @@ var (
 	reSuCmd         = regexp.MustCompile(`su\[\d+\]:\s+Successful su for (\S+) by (\S+)`)
 )
 
+// parseAuthLogLine phân tích log xác thực thành các Node User, Host, IPAddress, Process.
+// Hỗ trợ 5 dạng:
+// - SSH Accepted: Accepted password for root from 192.168.1.50 port 44212 ssh2
+// - SSH Failed: Failed password for invalid user admin from 10.0.0.5 port 55122
+// - Sudo Exec: sudo: dev_user : TTY=pts/0 ; USER=root ; COMMAND=/bin/bash
+// - PAM Session: session opened for user root
+// - Su Exec: su[1204]: Successful su for root by dev_user
 func parseAuthLogLine(input string) (ParsedLogLine, error) {
 	if len(input) < 16 {
 		return ParsedLogLine{}, fmt.Errorf("auth.log line is too short")
@@ -91,7 +98,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 		}
 	}
 
-	// Case 1: Accepted login (password / publickey / keyboard-interactive)
+	// Case 1: Accepted login
 	if matches := reAccepted.FindStringSubmatch(content); len(matches) == 4 {
 		username := matches[1]
 		ipAddr := matches[2]
@@ -148,7 +155,7 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 		}
 	}
 
-	// Case 2: Failed login (password / publickey / invalid user)
+	// Case 2: Failed login
 	if matches := reFailed.FindStringSubmatch(content); len(matches) == 4 {
 		username := matches[1]
 		ipAddr := matches[2]
@@ -275,10 +282,10 @@ func parseAuthLogLine(input string) (ParsedLogLine, error) {
 	if matches := reSuCmd.FindStringSubmatch(content); len(matches) == 3 {
 		targetUser := matches[1]
 		invoker := matches[2]
-		
+
 		invokerID := "user_" + invoker
 		targetUserID := "user_" + targetUser
-		
+
 		nodes = append(nodes,
 			Node{
 				ID:    invokerID,

@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// isStaticWebAsset kiểm tra URI có phải assets.
+// Ví dụ: /style.css, /bundle.js, /favicon.ico, /logo.png?v=1.
 func isStaticWebAsset(uri string) bool {
 	cleanURI := strings.ToLower(uri)
 	if idx := strings.IndexByte(cleanURI, '?'); idx > 0 {
@@ -27,7 +29,8 @@ func isStaticWebAsset(uri string) bool {
 		strings.HasSuffix(cleanURI, "robots.txt")
 }
 
-// splitURI extracts the base path and query parameters from a URI
+// splitURI tách base path và query string, giới hạn độ dài tối đa 100 ký tự.
+// Ví dụ: /api/login?user=admin -> /api/login, user=admin.
 func splitURI(uri string) (string, string) {
 	base := uri
 	query := ""
@@ -41,6 +44,8 @@ func splitURI(uri string) (string, string) {
 	return base, query
 }
 
+// parseApacheAccessLogLine phân tích log thành các Node IPAddress, HTTPRequest và quan hệ REQUESTED.
+// Ví dụ log: 192.168.1.10 - - [24/Jan/2022:14:39:57 +0000] "POST /wp-login.php HTTP/1.1" 200 5320 "-" "WPScan v3.8"
 func parseApacheAccessLogLine(input string) (ParsedLogLine, error) {
 	openBracket := strings.IndexByte(input, '[')
 	closeBracket := strings.IndexByte(input[openBracket+1:], ']')
@@ -135,9 +140,9 @@ func parseApacheAccessLogLine(input string) (ParsedLogLine, error) {
 			strings.Contains(uriLower, "id=") ||
 			strings.Contains(uriLower, "passwd") ||
 			strings.Contains(uriLower, "shadow") ||
-			strings.Contains(uriLower, "admin-ajax") ||
-			strings.Contains(uriLower, "ekmkimzkps") ||
-			strings.Contains(uriLower, "rockyou") ||
+			strings.Contains(uriLower, "eval(") ||
+			strings.Contains(uriLower, "base64") ||
+			strings.Contains(uriLower, "wordlist") ||
 			strings.Contains(uriLower, "<script") ||
 			strings.Contains(uriLower, "union") ||
 			strings.Contains(uriLower, "select") ||
@@ -149,13 +154,13 @@ func parseApacheAccessLogLine(input string) (ParsedLogLine, error) {
 			ID:    reqID,
 			Label: "HTTPRequest",
 			Properties: map[string]interface{}{
-				"method":                 method,
-				"uri":                    basePath,
-				"query_params":           queryParams,
-				"raw_uri":                uri,
-				"status_code":            statusCode,
-				"user_agent":             userAgent,
-				"is_scanner":             isScanner,
+				"method":                method,
+				"uri":                   basePath,
+				"query_params":          queryParams,
+				"raw_uri":               uri,
+				"status_code":           statusCode,
+				"user_agent":            userAgent,
+				"is_scanner":            isScanner,
 				"is_suspicious_payload": isSuspiciousPayload,
 			},
 		})

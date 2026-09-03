@@ -111,7 +111,10 @@ def load_ground_truth_from_attacktimes(attacktimes_file, scenario):
     return gt if gt else None
 
 def load_ground_truth(labels_file, scenario, attacktimes_file="alert-data-set-main/attacktimes.py"):
-    if attacktimes_file and os.path.exists(attacktimes_file):
+    # Nếu người dùng truyền một file nhãn tùy chỉnh (ví dụ labels2.csv), ưu tiên đọc trực tiếp từ file đó
+    if labels_file and labels_file != "ait_ads/labels.csv" and os.path.exists(labels_file):
+        pass
+    elif attacktimes_file and os.path.exists(attacktimes_file):
         gt = load_ground_truth_from_attacktimes(attacktimes_file, scenario)
         if gt:
             return gt
@@ -359,7 +362,7 @@ def eval_custom(custom_file, gt_template, dedup_window=0):
             else:
                 fp_count += 1
 
-    name = f"Custom Engine (Graph + Tree, Dedup {dedup_window}s)" if dedup_window > 0 else "Custom Engine (Graph + Tree)"
+    name = f"Custom Engine (Dedup {dedup_window}s)" if dedup_window > 0 else "Custom Engine"
     return calc_metrics(name, total_alerts, tp_count, fp_count, gt_stats)
 
 def calc_metrics(name, total_alerts, tp_count, fp_count, gt_stats):
@@ -385,18 +388,19 @@ def calc_metrics(name, total_alerts, tp_count, fp_count, gt_stats):
 
 def print_comparison_table(results, scenario):
     print("\n" + "="*85)
-    print(f"📊 BẢNG SO SÁNH HIỆU NĂNG PHÁT HIỆN TẤN CÔNG (Kịch bản: {scenario.upper()})")
+    print(f"BẢNG HIỆU NĂNG PHÁT HIỆN TẤN CÔNG ({scenario.upper()})")
     print("="*85)
-    
+
+    print()
     header = f"{'Chỉ số Đánh giá':<32} | " + " | ".join([f"{r['name']:<24}" for r in results])
     print(header)
     print("-" * len(header))
     
     row_total = f"{'Tổng số Alert sinh ra':<32} | " + " | ".join([f"{r['total_alerts']:<24,}" for r in results])
-    row_tp = f"{'True Positives (TP - Chuẩn)':<32} | " + " | ".join([f"{r['tp']:<24,}" for r in results])
-    row_fp = f"{'False Positives (FP - Nhiễu)':<32} | " + " | ".join([f"{r['fp']:<24,}" for r in results])
-    row_phases = f"{'Số Giai đoạn phát hiện':<32} | " + " | ".join([f"{r['detected_phases']}/{r['total_phases']} ({r['recall']:.1f}%)".ljust(24) for r in results])
-    row_prec = f"{'Precision (Độ chuẩn xác)':<32} | " + " | ".join([f"{r['precision']:.2f}%".ljust(24) for r in results])
+    row_tp = f"{'True Positives':<32} | " + " | ".join([f"{r['tp']:<24,}" for r in results])
+    row_fp = f"{'False Positives':<32} | " + " | ".join([f"{r['fp']:<24,}" for r in results])
+    row_phases = f"{'Số giai đoạn phát hiện':<32} | " + " | ".join([f"{r['detected_phases']}/{r['total_phases']} ({r['recall']:.1f}%)".ljust(24) for r in results])
+    row_prec = f"{'Precision':<32} | " + " | ".join([f"{r['precision']:.2f}%".ljust(24) for r in results])
     row_rec = f"{'Recall / Phase Coverage':<32} | " + " | ".join([f"{r['recall']:.2f}%".ljust(24) for r in results])
     row_f1 = f"{'F1-Score':<32} | " + " | ".join([f"{r['f1']:.2f}%".ljust(24) for r in results])
     
@@ -409,7 +413,7 @@ def print_comparison_table(results, scenario):
     print(row_f1)
     print("="*85)
 
-    print("\n📋 CHI TIẾT ĐỘ PHỦ TỪNG GIAI ĐOẠN (ATTACK PHASES):")
+    print("\nCHI TIẾT TỪNG GIAI ĐOẠN:")
     total_phases = results[0]["total_phases"]
     for i in range(total_phases):
         lbl = results[0]["gt_stats"][i]["label"]

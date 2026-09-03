@@ -29,6 +29,7 @@ var (
 	alertCooldownSecs int = 0
 )
 
+// initAlertCache khởi tạo cache để loại bỏ cảnh báo trùng lặp và thiết lập thời gian cooldown.
 func initAlertCache(cooldownSecs int) {
 	alertCacheMu.Lock()
 	defer alertCacheMu.Unlock()
@@ -36,8 +37,9 @@ func initAlertCache(cooldownSecs int) {
 	alertCooldownSecs = cooldownSecs
 }
 
+// extractEventTime lấy thời điểm xảy ra sự kiện tấn công từ các trường chi tiết kết quả truy vấn Cypher.
+// Ví dụ: tìm kiếm time_dnsteal, time_recon, time_privesc: 2022-01-24T13:50:40Z.
 func extractEventTime(details map[string]interface{}) (time.Time, bool) {
-	// Ưu tiên các trường thời gian cụ thể của node hiện tại
 	priorityKeys := []string{
 		"time_dns", "time_dnsteal", "time_sudo", "time_su", "time_privesc",
 		"time_rce", "time_revshell", "time_drop", "time_webshell",
@@ -76,6 +78,8 @@ func extractEventTime(details map[string]interface{}) (time.Time, bool) {
 	return time.Time{}, false
 }
 
+// extractMetricCount lấy số lượng tấn công || truy vấn || lỗi phục vụ ... dùng để tính tốc độ hoặc loại bỏ cảnh báo trùng lặp.
+// Ví dụ: dns_count=1050, recon_count=85, fails=12.
 func extractMetricCount(metricKey string, details map[string]interface{}) float64 {
 	if metricKey != "" {
 		if v, ok := details[metricKey]; ok {
@@ -94,7 +98,6 @@ func extractMetricCount(metricKey string, details map[string]interface{}) float6
 		}
 	}
 
-	// Tự động tìm trường số đếm phổ biến
 	countKeys := []string{"dns_count", "req_count", "recon_count", "scan_count", "fails", "count", "queries"}
 	for _, ck := range countKeys {
 		if v, ok := details[ck]; ok {
@@ -115,10 +118,11 @@ func extractMetricCount(metricKey string, details map[string]interface{}) float6
 	return 1.0
 }
 
+// generateAlertHash tạo khóa SHA-256 cho cảnh báo dựa trên RuleID, NodeID và các thuộc tính quan trọng.
+// Bỏ qua các trường thời gian động để nhận diện chính xác các đợt tấn công lặp lại cùng một thực thể như IP, User, File.
 func generateAlertHash(ruleID, nodeID string, node RuleTree, details map[string]interface{}) string {
 	stableDetails := make(map[string]interface{})
 
-	// 1. Nếu node có khai báo EntityKeys cụ thể, chỉ dùng các keys đó để hash
 	if len(node.EntityKeys) > 0 {
 		for _, ek := range node.EntityKeys {
 			if v, ok := details[ek]; ok {
@@ -126,7 +130,6 @@ func generateAlertHash(ruleID, nodeID string, node RuleTree, details map[string]
 			}
 		}
 	} else {
-		// 2. Mặc định lọc bỏ các trường thời gian động và số đếm động
 		for k, v := range details {
 			lowerK := strings.ToLower(k)
 			if strings.HasPrefix(lowerK, "time") ||
@@ -148,6 +151,7 @@ func generateAlertHash(ruleID, nodeID string, node RuleTree, details map[string]
 	return fmt.Sprintf("%s:%s:%x", ruleID, nodeID, hash)
 }
 
+// isDuplicateAlertNode kiểm tra cảnh báo có bị trùng lặp hay không dựa trên thời gian tĩnh Cooldown, ngưỡng MinVelocity, hoặc tỷ lệ MinGrowthRatio.
 func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interface{}) bool {
 	if alertCache == nil {
 		return false
@@ -166,7 +170,7 @@ func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interfa
 	alertCacheMu.RUnlock()
 
 	if exists {
-		// 1. Nếu đặt alertCooldownSecs <= 0: Khử trùng vĩnh viễn
+		// 1. Nếu đặt alertCooldownSecs <= 0: Loại bỏ cảnh báo lặp trên toàn tập alerts
 		if alertCooldownSecs <= 0 {
 			return true
 		}
@@ -176,12 +180,11 @@ func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interfa
 			diffTime = -diffTime
 		}
 
-		// 1. Kiểm tra Cooldown thời gian tĩnh mặc định
+		// 1. Kiểm tra Cooldown
 		if diffTime < time.Duration(alertCooldownSecs)*time.Second {
 			return true
 		}
 
-		// 2. Nếu có cấu hình Tốc độ tăng trưởng MinVelocity (ví dụ > 50 queries/phút)
 		if node.MinVelocity > 0 && diffTime.Seconds() > 0 {
 			deltaCount := currentCount - entry.LastCount
 			if deltaCount < 0 {
@@ -193,7 +196,6 @@ func isDuplicateAlertNode(hash string, node RuleTree, details map[string]interfa
 			}
 		}
 
-		// 3. Nếu có cấu hình Tỷ lệ tăng trưởng MinGrowthRatio (ví dụ tăng >= 2.0 lần)
 		if node.MinGrowthRatio > 1.0 {
 			if entry.LastCount > 0 && currentCount < (entry.LastCount*node.MinGrowthRatio) && diffTime < 6*time.Hour {
 				return true
@@ -263,6 +265,7 @@ func getSeverityLevel(sev string) int {
 	}
 }
 
+// loadRulesFromPath quét và đọc các quy tắc phát hiện từ đường dẫn.
 func loadRulesFromPath(rulesPath string) ([]DetectionRule, error) {
 	var rules []DetectionRule
 
@@ -271,19 +274,23 @@ func loadRulesFromPath(rulesPath string) ([]DetectionRule, error) {
 		return nil, err
 	}
 
-	var files []string
+	var filePaths []string
 	if info.IsDir() {
-		entries, err := filepath.Glob(filepath.Join(rulesPath, "*.json"))
+		entries, err := os.ReadDir(rulesPath)
 		if err != nil {
 			return nil, err
 		}
-		files = entries
+		for _, e := range entries {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
+				filePaths = append(filePaths, filepath.Join(rulesPath, e.Name()))
+			}
+		}
 	} else {
-		files = append(files, rulesPath)
+		filePaths = append(filePaths, rulesPath)
 	}
 
-	for _, file := range files {
-		data, err := os.ReadFile(file)
+	for _, p := range filePaths {
+		data, err := os.ReadFile(p)
 		if err != nil {
 			continue
 		}
@@ -305,6 +312,7 @@ func loadRulesFromPath(rulesPath string) ([]DetectionRule, error) {
 	return rules, nil
 }
 
+// runCypherQuery thực thi truy vấn Cypher qua HTTP endpoint của Neo4j và trả kết quả dạng map.
 func runCypherQuery(url, user, pass, query string, params map[string]interface{}) ([]map[string]interface{}, error) {
 	if params == nil {
 		params = make(map[string]interface{})
@@ -415,7 +423,6 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 		return 0
 	}
 
-	// Check if this node should emit alert (default true unless explicitly set to false)
 	shouldEmit := true
 	if node.EmitAlert != nil {
 		shouldEmit = *node.EmitAlert
@@ -461,8 +468,6 @@ func evaluateRuleTreeNode(url, user, pass string, rule DetectionRule, node RuleT
 						_ = alertWriter.Flush()
 					}
 				}
-			} else {
-				// Duplicate alert, suppressed
 			}
 		}
 

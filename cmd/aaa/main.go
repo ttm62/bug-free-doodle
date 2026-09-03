@@ -193,14 +193,12 @@ func main() {
 		return
 	}
 
-	// Nếu chạy mode stream (Live Replay + Concurrent Periodic Detection)
 	isStreamMode := (*mode == "stream")
 	sinkMode := *mode
 	if isStreamMode {
-		sinkMode = "neo4j" // Tự động ghi trực tiếp vào Neo4j
+		sinkMode = "neo4j"
 		initAlertCache(*alertCooldown)
 
-		// Khởi động background scanner chạy song song
 		go func() {
 			ticker := time.NewTicker(time.Duration(*scanInterval) * time.Second)
 			defer ticker.Stop()
@@ -302,7 +300,6 @@ func main() {
 
 	fmt.Printf("[+] Finished processing %d log events in %v. Mode: %s\n", processedCount, time.Since(startTime), *mode)
 
-	// Nếu chạy mode stream, chạy quét một lượt cuối cùng để đảm bảo không sót cảnh báo
 	if isStreamMode {
 		fmt.Printf("\n[*] [Stream Mode] Final detection scan on completed graph...\n")
 		runDetectionMode(*rulesPath, *alertsFile, *minSeverity, *neo4jURL, *neo4jUser, *neo4jPass, true)

@@ -15,7 +15,6 @@ type WazuhArchiveInner struct {
 	FullLog   string `json:"full_log"`
 }
 
-// WazuhArchiveEvent represents a log event received from Wazuh's archives.json via Vector
 type WazuhArchiveEvent struct {
 	Message   WazuhArchiveInner `json:"message"`
 	Timestamp string            `json:"timestamp"`
@@ -23,7 +22,6 @@ type WazuhArchiveEvent struct {
 	FullLog   string            `json:"full_log"`
 }
 
-// runWebhookMode starts the HTTP server for Vector and the background scanner
 func runWebhookMode(port, scanInterval int, rulesPath, alertsFilePath, minSeverityFilter, neo4jURL, neo4jUser, neo4jPass string) {
 	fmt.Printf("[*] Starting Webhook Mode on port %d\n", port)
 
@@ -33,9 +31,6 @@ func runWebhookMode(port, scanInterval int, rulesPath, alertsFilePath, minSeveri
 		log.Fatalf("[!] Failed to connect to Neo4j: %v", err)
 	}
 	defer sink.Close()
-
-	// Initialize the detector cache
-	// (Được cấu hình thông qua flag -alert-cooldown từ main.go)
 
 	// Start background scanner
 	go func() {
@@ -97,8 +92,6 @@ func runWebhookMode(port, scanInterval int, rulesPath, alertsFilePath, minSeveri
 				continue
 			}
 
-			// Ưu tiên Timestamp gốc được trích xuất từ nội dung log (năm 2022)
-			// Chỉ fallback sang Wazuh container timestamp nếu parser không bóc tách được timestamp
 			if parsed.Timestamp.IsZero() && timestampStr != "" {
 				if t, err := time.Parse(time.RFC3339Nano, timestampStr); err == nil {
 					parsed.Timestamp = t
@@ -148,7 +141,6 @@ func detectLogType(location, logLine string) string {
 		return "audit_log"
 	}
 
-	// Khi nhận log qua Syslog Network (location là IP như 192.168.65.1 hoặc wazuh-remoted)
 	trimmed := strings.TrimSpace(logLine)
 	if strings.HasPrefix(trimmed, "{") && strings.Contains(trimmed, `"event_type"`) {
 		return "suricata"

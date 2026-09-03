@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// parseSyslogLine phân tích log định dạng RFC 3164 thành các Node Process, Host và quan hệ RAN_ON.
+// Ví dụ log: Jan 16 07:16:17 target-server systemd[1]: Stopping Apache HTTP Server...
 func parseSyslogLine(input string) (ParsedLogLine, error) {
 	if len(input) < 16 {
 		return ParsedLogLine{}, fmt.Errorf("syslog line is too short")

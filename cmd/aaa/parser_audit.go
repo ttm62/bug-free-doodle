@@ -8,13 +8,15 @@ import (
 	"time"
 )
 
-// isNoisyPath filters out benign system library, proc, sys, and cache files that create 80%+ graph bloat
+// isNoisyPath lọc các đường dẫn file tạm, thư viện hệ thống như .so, /proc, /sys để giảm nhiễu cho đồ thị
+// Ví dụ: loại trừ /proc/stat, /lib/x86_64/libc.so; giữ lại /etc/shadow, /etc/passwd, /tmp/backdoor.sh.
 func isNoisyPath(path string) bool {
 	cleanPath := filepath.Clean(path)
 	if cleanPath == "" || cleanPath == "." || cleanPath == "/" {
 		return true
 	}
-	// Always KEEP security critical files
+
+	// Giữ các tệp nhạy cảm
 	if strings.Contains(cleanPath, "passwd") ||
 		strings.Contains(cleanPath, "shadow") ||
 		strings.Contains(cleanPath, "sudoers") ||
@@ -28,7 +30,8 @@ func isNoisyPath(path string) bool {
 		strings.HasPrefix(cleanPath, "/root/") {
 		return false
 	}
-	// Filter out non-security noise
+
+	// Loại bỏ nhiễu
 	return strings.HasPrefix(cleanPath, "/proc/") ||
 		strings.HasPrefix(cleanPath, "/sys/") ||
 		strings.HasPrefix(cleanPath, "/lib/") ||
@@ -41,7 +44,8 @@ func isNoisyPath(path string) bool {
 		strings.HasPrefix(cleanPath, "/var/log/journal/")
 }
 
-// decodeAuditdIPv4 decodes a hex-encoded sockaddr_in (AF_INET) from auditd
+// decodeAuditdIPv4 giải mã struct sockaddr_in định dạng hex của auditd thành địa chỉ IPv4 và Port.
+// Ví dụ: saddr="02000050C0A80101..." -> 192.168.1.1, port 80.
 func decodeAuditdIPv4(saddr string) (string, string) {
 	if len(saddr) < 16 {
 		return "", ""
@@ -50,7 +54,7 @@ func decodeAuditdIPv4(saddr string) (string, string) {
 		return "", ""
 	}
 
-	// Ensure we only decode hex bytes
+	// Giải mã các bytes hex
 	hexPart := saddr[4:16]
 
 	portHex1, err1 := strconv.ParseUint(hexPart[0:2], 16, 8)
@@ -69,7 +73,8 @@ func decodeAuditdIPv4(saddr string) (string, string) {
 	return ip, strconv.Itoa(port)
 }
 
-// isBenignSystemProc checks if executable is a routine short-lived system daemon
+// isBenignSystemProc kiểm tra xem process có phải daemon của OS không.
+// Ví dụ: apparmor, systemd-timesyncd, kworker, dbus-daemon.
 func isBenignSystemProc(exe, comm string) bool {
 	combined := strings.ToLower(exe + " " + comm)
 	return strings.Contains(combined, "apparmor") ||
@@ -82,7 +87,8 @@ func isBenignSystemProc(exe, comm string) bool {
 		strings.Contains(combined, "auditd")
 }
 
-// parseKeyValueString parses auditd key=value pairs into a map
+// parseKeyValueString tách chuỗi key=value từ auditd có xử lý chuỗi trong dấu nháy kép.
+// Ví dụ: `type=EXECVE a0="cat" a1="/etc/shadow"` -> {"type":"EXECVE", "a0":"cat", "a1":"/etc/shadow"}.
 func parseKeyValueString(str string) map[string]string {
 	res := make(map[string]string)
 	inQuotes := false
@@ -120,6 +126,7 @@ func parseKeyValueString(str string) map[string]string {
 	return res
 }
 
+// parseAuditLogLine phân tích log thành các Node Process, User, File, IPAddress và các quan hệ SPAWNED, READ, WRITE, EXECUTED, CONNECTED, RAN_AS.
 func parseAuditLogLine(input string) (ParsedLogLine, error) {
 	auditStart := strings.Index(input, "audit(")
 	if auditStart < 0 {
@@ -173,7 +180,7 @@ func parseAuditLogLine(input string) (ParsedLogLine, error) {
 	unit := kv["unit"]
 
 	if isBenignSystemProc(exe, comm) && auditType != "SERVICE_STOP" && auditType != "SERVICE_START" {
-		// Drop this log line to reduce graph bloat
+		// Loại bỏ để giảm nhiễu cho đồ thị
 		return ParsedLogLine{}, nil
 	}
 
@@ -196,6 +203,7 @@ func parseAuditLogLine(input string) (ParsedLogLine, error) {
 		}
 		if auditType == "SERVICE_STOP" || auditType == "SERVICE_START" {
 			procProps["is_service_event"] = true
+			procProps["timestamp"] = ts.Format(time.RFC3339Nano)
 		}
 
 		nodes = append(nodes, Node{

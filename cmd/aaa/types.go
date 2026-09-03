@@ -8,14 +8,12 @@ import (
 	"time"
 )
 
-// Node represents a vertex in the provenance graph (e.g. Host, User, Process, File, IPAddress, HTTPRequest, Alert)
 type Node struct {
 	ID         string                 `json:"id"`
 	Label      string                 `json:"label"`
 	Properties map[string]interface{} `json:"properties,omitempty"`
 }
 
-// Relationship represents a directed edge in the provenance graph
 type Relationship struct {
 	FromID     string                 `json:"from_id"`
 	FromLabel  string                 `json:"from_label"`
@@ -26,7 +24,6 @@ type Relationship struct {
 	Properties map[string]interface{} `json:"properties,omitempty"`
 }
 
-// ParsedLogLine contains extracted timestamp, content, and provenance graph entities/relationships
 type ParsedLogLine struct {
 	Timestamp     time.Time
 	Content       string
@@ -34,7 +31,6 @@ type ParsedLogLine struct {
 	Relationships []Relationship
 }
 
-// ReplayEntry represents an entry stored in the min-heap for timestamp-ordered replay
 type ReplayEntry struct {
 	Timestamp     time.Time
 	SourceIndex   int
@@ -45,7 +41,6 @@ type ReplayEntry struct {
 	Relationships []Relationship
 }
 
-// OutputEvent represents the serialized JSON event emitted by the replay sink
 type OutputEvent struct {
 	Timestamp     string         `json:"timestamp"`
 	LogType       string         `json:"log_type"`
@@ -57,16 +52,13 @@ type OutputEvent struct {
 	Relationships []Relationship `json:"relationships,omitempty"`
 }
 
-// LogParser is the function signature for log line parsers
 type LogParser func(string) (ParsedLogLine, error)
 
-// LogPattern matches file path globs to log types
 type LogPattern struct {
 	Pattern string
 	LogType string
 }
 
-// ReplaySource tracks reading from an individual log file
 type ReplaySource struct {
 	Path           string
 	LogType        string
@@ -87,7 +79,6 @@ const (
 	defaultRate       = 100.0
 )
 
-// EventSink interface for emitting parsed graph events
 type EventSink interface {
 	WriteEvent(event OutputEvent) error
 	Close() error
@@ -147,7 +138,6 @@ func openEventSink(mode, filePath, neo4jURL, neo4jUser, neo4jPass, wazuhAddr str
 	}
 }
 
-// EntryHeap implements container/heap.Interface for ordering ReplayEntries by Timestamp
 type EntryHeap []ReplayEntry
 
 func (h EntryHeap) Len() int { return len(h) }

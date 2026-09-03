@@ -14,9 +14,9 @@
       ],
       "rate_metric": "fails",
       "min_growth_ratio": 2.0,
-      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'rockyou' OR http.uri CONTAINS 'wordlist' OR http.uri ENDS WITH '/shadow' OR http.uri ENDS WITH '/.htpasswd' OR http.uri ENDS WITH '/htpasswd') AND NOT http.uri CONTAINS 'change_password' WITH ip, count(req) AS fails, max(datetime(req.last_seen)) AS time_cracking WHERE fails >= 1 RETURN ip.ip AS attacker_ip, 'rockyou' AS target_user, fails, 'wordlist_hash' AS wordlist_uri, toString(time_cracking) AS time_cracking",
+      "query": "MATCH (ip:IPAddress)-[req:REQUESTED]->(http:HTTPRequest) WHERE (http.uri CONTAINS 'rockyou' OR http.uri CONTAINS 'wordlist' OR http.uri ENDS WITH '/shadow' OR http.uri ENDS WITH '/.htpasswd' OR http.uri ENDS WITH '/htpasswd') AND NOT http.uri CONTAINS 'change_password' WITH ip, count(req) AS fails, max(datetime(req.last_seen)) AS time_cracking WHERE fails >= 1 RETURN ip.ip AS attacker_ip, 'credential_harvesting' AS target_user, fails, 'wordlist_hash' AS wordlist_uri, toString(time_cracking) AS time_cracking",
       "on_match": {
-        "alert_message": "🚨 [MEDIUM] Phát hiện IP {attacker_ip} tải mật khẩu băm ({wordlist_uri}) lúc {time_cracking}",
+        "alert_message": "🚨 [MEDIUM] Phát hiện IP {attacker_ip} tải mật khẩu ({wordlist_uri}) lúc {time_cracking}",
         "next": []
       }
     }
@@ -33,7 +33,7 @@
       "emit_alert": true,
       "query": "MATCH (p:Process)-[w:WRITE]->(f:File) WHERE f.path CONTAINS '.ssh/authorized_keys' RETURN p.exe AS proc, f.path AS key_file, toString(max(datetime(w.last_seen))) AS time_mod",
       "on_match": {
-        "alert_message": "🚨 [HIGH] Tiến trình {proc} vừa ghi đè vào file chứa khóa SSH ({key_file}) lúc {time_mod}. Có khả năng Hacker đang cắm rễ (Persistence) để duy trì truy cập!",
+        "alert_message": "🚨 [HIGH] Tiến trình {proc} vừa ghi đè vào file chứa khóa SSH ({key_file}) lúc {time_mod}.",
         "next": []
       }
     }
@@ -97,8 +97,8 @@
         "attacker_ip"
       ],
       "rate_metric": "dns_count",
-      "min_growth_ratio": 2.0,
-      "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE dns.is_exfiltration = true OR (size(dns.rrname) > 80 AND NOT dns.rrname CONTAINS 'in-addr.arpa' AND NOT dns.rrname CONTAINS 'local') WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dnsteal WHERE dns_count >= 1000 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
+      "min_growth_ratio": 1.05,
+      "query": "MATCH (ip:IPAddress)-[rel:QUERIED]->(dns:DNSQuery) WHERE dns.is_exfiltration = true WITH ip, count(rel) AS dns_count, max(datetime(rel.last_seen)) AS time_dnsteal WHERE dns_count >= 50 RETURN ip.ip AS attacker_ip, dns_count, toString(time_dnsteal) AS time_dnsteal",
       "on_match": {
         "alert_message": "🚨 [CRITICAL] Phát hiện rò rỉ dữ liệu qua DNS từ {attacker_ip} ({dns_count} queries) lúc {time_dnsteal}!",
         "next": []
@@ -138,9 +138,9 @@
       "entity_keys": [
         "user"
       ],
-      "query": "MATCH (u:User)-[r:RAN_AS]->(p:Process) WHERE (p.audit_type = 'SERVICE_STOP' OR p.is_service_event = true OR r.command CONTAINS 'stop' OR r.command CONTAINS 'disable' OR r.command CONTAINS 'kill' OR r.command CONTAINS 'systemctl' OR p.command CONTAINS 'stop' OR p.command CONTAINS 'disable' OR p.command CONTAINS 'kill') AND (p.unit IS NOT NULL OR r.command CONTAINS 'wazuh' OR r.command CONTAINS 'suricata' OR r.command CONTAINS 'audit' OR r.command CONTAINS 'syslog' OR r.command CONTAINS 'filebeat' OR r.command CONTAINS 'ossec' OR r.command CONTAINS 'service' OR p.command CONTAINS 'audit' OR p.command CONTAINS 'suricata') RETURN u.username AS user, coalesce(p.unit, r.command, p.command, p.exe) AS stop_cmd, toString(max(datetime(r.timestamp))) AS time_service_stop",
+      "query": "MATCH (p:Process) WHERE (p.audit_type = 'SERVICE_STOP' OR p.is_service_event = true OR p.command CONTAINS 'stop' OR p.command CONTAINS 'disable' OR p.command CONTAINS 'kill') AND (p.unit IS NOT NULL OR p.command CONTAINS 'wazuh' OR p.command CONTAINS 'suricata' OR p.command CONTAINS 'audit' OR p.command CONTAINS 'syslog' OR p.command CONTAINS 'service') OPTIONAL MATCH (u:User)<-[:RAN_AS]-(p) RETURN coalesce(u.username, 'system') AS user, coalesce(p.unit, p.command, p.exe) AS stop_cmd, toString(max(datetime(p.timestamp))) AS time_service_stop",
       "on_match": {
-        "alert_message": "🚨 [CRITICAL] Tài khoản {user} đã cố gắng tắt dịch vụ bảo mật: {stop_cmd} lúc {time_service_stop}!",
+        "alert_message": "🚨 [CRITICAL] Tài khoản {user} đã tắt dịch vụ bảo mật: {stop_cmd} lúc {time_service_stop}!",
         "next": []
       }
     }

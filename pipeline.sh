@@ -52,7 +52,8 @@ run_stream_benchmark() {
     -scan-interval 1 \
     -alert-cooldown 300
 
-  python3 compare_ids_benchmarks.py --scenario "$NAME" --custom "${NAME}_alerts.jsonl"
+  # python3 compare_ids_benchmarks.py --scenario "$NAME" --custom "${NAME}_alerts.jsonl"
+  python3 compare_ids_benchmarks.py --scenario "$NAME" --custom "${NAME}_alerts.jsonl" --labels ait_ads/labels2.csv
 
   # source env/bin/activate
   # python3 eval_alerts.py "${NAME}_alerts.jsonl" ait_ads/labels.csv "$NAME"
@@ -60,11 +61,33 @@ run_stream_benchmark() {
   # python3 plot_stats_boxplot.py
 }
 
-# run_stream_benchmark santos 7474
+extract_and_recover_dnsteal() {
+  local NAME=$1
+  local FOLDER=${2:-"${NAME}_no-pcaps"}
+  local ENTITIES_FILE="${FOLDER}_entities.json"
+  local OUT_DIR=${3:-"recovered_${NAME}"}
+
+  echo "=== Extracting entities & recovering DNSteal files for: $NAME ==="
+  python3 extract_entities.py "$FOLDER"
+  python3 recover_dnsteal_files.py "$ENTITIES_FILE" --output "$OUT_DIR"
+}
+
+# extract_and_recover_dnsteal santos
+# extract_and_recover_dnsteal russellmitchell
+# extract_and_recover_dnsteal fox
+# extract_and_recover_dnsteal wardbeck
+# extract_and_recover_dnsteal harrison
+# extract_and_recover_dnsteal wheeler
+# extract_and_recover_dnsteal shaw
+extract_and_recover_dnsteal wilson
+
+
 # run_stream_benchmark russellmitchell 7475 neo4j_russell
+# run_stream_benchmark santos 7474
 # run_stream_benchmark fox 7476
 # run_stream_benchmark wardbeck 7477
 # run_stream_benchmark harrison 7478
 # run_stream_benchmark wheeler 7479
 # run_stream_benchmark shaw 7480
-# run_stream_benchmark wilson 7481
+run_stream_benchmark wilson 7481
+

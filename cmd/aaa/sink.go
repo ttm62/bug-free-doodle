@@ -112,7 +112,6 @@ func (s *neo4jSink) WriteEvent(event OutputEvent) error {
 
 	eventTS := event.Timestamp
 
-	// 1. Merge Nodes with property updates
 	for _, node := range event.Nodes {
 		props := make(map[string]interface{})
 		for k, v := range node.Properties {
@@ -130,7 +129,6 @@ func (s *neo4jSink) WriteEvent(event OutputEvent) error {
 		})
 	}
 
-	// 2. Merge Relationships with Weighted Temporal Aggregation (ON CREATE / ON MATCH)
 	for _, rel := range event.Relationships {
 		props := make(map[string]interface{})
 		for k, v := range rel.Properties {
@@ -180,7 +178,6 @@ func (s *neo4jSink) flush() error {
 
 	endpoint := s.url + "/db/neo4j/tx/commit"
 
-	// Cơ chế Retry với Exponential Backoff khi gặp Deadlock (TransientError)
 	maxRetries := 5
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonBytes))

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// isPrivateIP checks if an IP is in RFC 1918 private ranges (10.x, 172.16-31.x, 192.168.x, 127.x)
+// isPrivateIP kiểm tra địa chỉ IP có thuộc dải mạng nội bộ RFC 1918.
 func isPrivateIP(ip string) bool {
 	if strings.HasPrefix(ip, "10.") ||
 		strings.HasPrefix(ip, "192.168.") ||
@@ -30,6 +30,45 @@ func isPrivateIP(ip string) bool {
 	return false
 }
 
+// isSuspiciousDnsTunneling phát hiện lưu lượng DNS Tunneling theo cấu trúc RFC 1035 với độ dài FQDN > 75 ký tự, nhãn subdomain >= 4 cấp, tỷ lệ ký tự mã hóa cao >= 20%.
+// Ví dụ: 3x6-.0-.UEsDBBQAAAAIABSgXFIHQU1igQAAALE...invoices.xlsx.web-03.example.com.
+func isSuspiciousDnsTunneling(rrname string) bool {
+	if len(rrname) < 75 {
+		return false
+	}
+	if strings.Contains(rrname, "in-addr.arpa") || strings.Contains(rrname, "ip6.arpa") {
+		return false
+	}
+
+	labels := strings.Split(rrname, ".")
+	if len(labels) < 4 {
+		return false
+	}
+
+	maxLabelLen := 0
+	specialOrDigit := 0
+	for _, l := range labels {
+		if len(l) > maxLabelLen {
+			maxLabelLen = len(l)
+			specialOrDigit = 0
+			for i := 0; i < len(l); i++ {
+				c := l[i]
+				if (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '*' {
+					specialOrDigit++
+				}
+			}
+		}
+	}
+
+	if maxLabelLen >= 40 && float64(specialOrDigit)/float64(maxLabelLen) >= 0.20 {
+		return true
+	}
+
+	return len(labels) >= 6 && maxLabelLen >= 30
+}
+
+// parseSuricataLogLine phân tích eve.json thành các Node IPAddress, Alert, HTTPRequest, DNSQuery và các quan hệ RAISED, TARGETED, REQUESTED, QUERIED.
+// Ví dụ log: {"timestamp":"2022-01-24T14:39:57.123+0000","event_type":"dns","src_ip":"192.168.1.10","dns":{"rrname":"3x6-data.example.com","rrtype":"A"}}
 func parseSuricataLogLine(input string) (ParsedLogLine, error) {
 	var event map[string]interface{}
 	if err := json.Unmarshal([]byte(input), &event); err != nil {
@@ -175,9 +214,9 @@ func parseSuricataLogLine(input string) (ParsedLogLine, error) {
 					ID:    dnsID,
 					Label: "DNSQuery",
 					Properties: map[string]interface{}{
-						"rrname":            rrname,
-						"rrtype":            rrtype,
-						"is_exfiltration": strings.Contains(rrname, "kennedy-mendoza") || strings.Contains(rrname, "dnsteal") || strings.Contains(rrname, "oastify") || strings.Contains(rrname, "burpcollaborator") || strings.Contains(rrname, "cisc0-update") || len(rrname) > 60,
+						"rrname":          rrname,
+						"rrtype":          rrtype,
+						"is_exfiltration": isSuspiciousDnsTunneling(rrname),
 					},
 				})
 

@@ -53,8 +53,8 @@
                   "compromised_user"
                 ],
                 "rate_metric": "dns_count",
-                "min_velocity": 10.0,
-                "query": "MATCH (ip:IPAddress)-[q:QUERIED]->(dns:DNSQuery) WHERE (dns.is_exfiltration = true OR (size(dns.rrname) > 60 AND NOT dns.rrname CONTAINS 'in-addr.arpa')) AND datetime(q.last_seen) >= datetime($time_su) AND datetime(q.last_seen) <= datetime($time_su) + duration('PT12H') WITH ip, count(q) AS dns_count, max(datetime(q.last_seen)) AS time_dns WHERE dns_count >= 100 RETURN ip.ip AS exfil_ip, dns_count, toString(time_dns) AS time_dns",
+                "min_growth_ratio": 1.05,
+                "query": "MATCH (ip:IPAddress)-[rel:QUERIED]->(dns:DNSQuery) WHERE dns.is_exfiltration = true AND datetime(rel.last_seen) >= datetime($time_su) AND datetime(rel.last_seen) <= datetime($time_su) + duration('PT12H') WITH ip, count(rel) AS dns_count, max(datetime(rel.last_seen)) AS time_dns WHERE dns_count >= 50 RETURN ip.ip AS exfil_ip, dns_count, toString(time_dns) AS time_dns",
                 "on_match": {
                   "alert_message": "💥 [HIGH] Máy chủ {exfil_ip} đang gửi {dns_count} gói dữ liệu qua DNS Tunneling lúc {time_dns}!",
                   "next": []
