@@ -72,8 +72,42 @@ extract_and_recover_dnsteal() {
   python3 recover_dnsteal_files.py "$ENTITIES_FILE" --output "$OUT_DIR"
 }
 
+run_compare_benchmark() {
+  local NAME=$1
+  local LABELS=${2:-"ait_ads/labels2.csv"}
+  local ALERTS_FILE="${NAME}_alerts.jsonl"
+
+  echo "=== Running Benchmark Comparison for Scenario: $NAME (Labels: $LABELS) ==="
+  if [ ! -f "$ALERTS_FILE" ]; then
+    echo "⚠️  Alerts file not found: $ALERTS_FILE"
+    return 1
+  fi
+
+  python3 compare_ids_benchmarks.py \
+    --scenario "$NAME" \
+    --labels "$LABELS" \
+    --attacktimes "" \
+    --custom "$ALERTS_FILE"
+}
+
+run_compare_all_benchmarks() {
+  local LABELS=${1:-"ait_ads/labels2.csv"}
+  local SCENARIOS=("russellmitchell" "fox" "santos" "wardbeck" "shaw" "harrison" "wheeler" "wilson")
+
+  echo "========================================================================="
+  echo "🚀 RUNNING IDS BENCHMARK ON ALL SCENARIOS (Labels: $LABELS)"
+  echo "========================================================================="
+
+  for SC in "${SCENARIOS[@]}"; do
+    run_compare_benchmark "$SC" "$LABELS"
+    echo ""
+  done
+}
+
+# ========== Replay and benchmark ==========
+
 # extract_and_recover_dnsteal santos
-extract_and_recover_dnsteal russellmitchell
+# extract_and_recover_dnsteal russellmitchell
 # extract_and_recover_dnsteal fox
 # extract_and_recover_dnsteal wardbeck
 # extract_and_recover_dnsteal harrison
@@ -81,8 +115,7 @@ extract_and_recover_dnsteal russellmitchell
 # extract_and_recover_dnsteal shaw
 # extract_and_recover_dnsteal wilson
 
-
-run_stream_benchmark russellmitchell 7475 neo4j_russell
+# run_stream_benchmark russellmitchell 7475 neo4j_russell
 # run_stream_benchmark santos 7474
 # run_stream_benchmark fox 7476
 # run_stream_benchmark wardbeck 7477
@@ -90,4 +123,17 @@ run_stream_benchmark russellmitchell 7475 neo4j_russell
 # run_stream_benchmark wheeler 7479
 # run_stream_benchmark shaw 7480
 # run_stream_benchmark wilson 7481
+
+# ========== Benchmark: labels2.csv || labels.csv ==========
+run_compare_benchmark russellmitchell ait_ads/labels2.csv
+# run_compare_benchmark fox ait_ads/labels2.csv
+# run_compare_benchmark santos ait_ads/labels2.csv
+# run_compare_benchmark wardbeck ait_ads/labels2.csv
+# run_compare_benchmark shaw ait_ads/labels2.csv
+# run_compare_benchmark harrison ait_ads/labels2.csv
+# run_compare_benchmark wheeler ait_ads/labels2.csv
+# run_compare_benchmark wilson ait_ads/labels2.csv
+
+# run_compare_all_benchmarks ait_ads/labels2.csv
+
 
