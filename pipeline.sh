@@ -73,21 +73,21 @@ extract_and_recover_dnsteal() {
 }
 
 # extract_and_recover_dnsteal santos
-# extract_and_recover_dnsteal russellmitchell
+extract_and_recover_dnsteal russellmitchell
 # extract_and_recover_dnsteal fox
 # extract_and_recover_dnsteal wardbeck
 # extract_and_recover_dnsteal harrison
 # extract_and_recover_dnsteal wheeler
 # extract_and_recover_dnsteal shaw
-extract_and_recover_dnsteal wilson
+# extract_and_recover_dnsteal wilson
 
 
-# run_stream_benchmark russellmitchell 7475 neo4j_russell
+run_stream_benchmark russellmitchell 7475 neo4j_russell
 # run_stream_benchmark santos 7474
 # run_stream_benchmark fox 7476
 # run_stream_benchmark wardbeck 7477
 # run_stream_benchmark harrison 7478
 # run_stream_benchmark wheeler 7479
 # run_stream_benchmark shaw 7480
-run_stream_benchmark wilson 7481
+# run_stream_benchmark wilson 7481
 
